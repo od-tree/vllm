@@ -1133,6 +1133,14 @@ class EngineCore:
         return self.is_scheduler_paused() or self.model_executor.is_sleeping
 
     def execute_dummy_batch(self):
+        step = None
+        take = getattr(self.scheduler, "take_head_tp_idle_step", None)
+        if take is not None:
+            step = take()
+        if step is not None:
+            self.model_executor.collective_rpc(
+                "set_head_tp_idle_step", args=(step,)
+            )
         self.model_executor.execute_dummy_batch()
 
     def compute_weight_checksums(self) -> list[dict[str, str]]:
@@ -2447,6 +2455,32 @@ class DPEngineCoreProc(EngineCoreProc):
             engine_index=dp_rank,
             tensor_queue=tensor_queue,
         )
+        self._attach_head_tp_wire()
+
+    def _attach_head_tp_wire(self) -> None:
+        sched = self.scheduler
+        if not getattr(sched, "head_tp_sync_enabled", False):
+            return
+        from vllm.v1.head_tp_sched import TorchDPHeadTPWire
+
+        sched.attach_head_tp_wire(TorchDPHeadTPWire(self.dp_group, self.dp_size))
+
+    def _join_idle_head_tp(
+        self, executed: bool, was_running: bool, local_unfinished: bool
+    ) -> None:
+        # A rank that scheduled already entered the collectives. An idle rank
+        # in a live wave must enter the same two collectives or the group hangs.
+        # When every rank is idle, nobody is waiting.
+        if (
+            not executed
+            and not local_unfinished
+            and not self.engines_running
+            and not was_running
+        ):
+            return
+        join = getattr(self.scheduler, "join_idle_head_tp", None)
+        if join is not None:
+            join()
 
     def _init_data_parallel(self, vllm_config: VllmConfig):
         # Configure GPUs and stateless process group for data parallel.
@@ -2617,6 +2651,7 @@ class DPEngineCoreProc(EngineCoreProc):
             self._maybe_publish_request_counts()
 
             local_unfinished_reqs = self.scheduler.has_unfinished_requests()
+            self._join_idle_head_tp(executed, was_running, local_unfinished_reqs)
             if not executed:
                 if not local_unfinished_reqs and not self.engines_running:
                     # All engines are idle.

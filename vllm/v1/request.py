@@ -244,12 +244,15 @@ class Request:
         # the scheduler so the connector's request_finished hook runs.
         self.abort_immediately = abort_immediately
 
-        # Head collaboration. Empty until the scheduler decides, once, at the
-        # first decode token. ``prefix_cpu_hit_tokens`` is filled when that
-        # decision reads the CPU prefix layer.
+        # Head collaboration. Empty until a decode step decides to pair.
+        # ``head_tp_next_check_tokens`` skips ``decide`` until the request has
+        # that many computed tokens. ``prefix_cpu_hit_tokens`` is filled when
+        # a pairing decision reads the CPU prefix layer.
         self.head_tp_plan: HeadTPPlan | None = None
         self.predicted_remaining: int | None = None
         self.prefix_cpu_hit_tokens: int = 0
+        self.head_tp_next_check_tokens: int = 0
+        self.head_tp_collab_tokens: int = 0
 
     @classmethod
     def from_engine_core_request(

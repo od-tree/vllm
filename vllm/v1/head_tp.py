@@ -59,9 +59,10 @@ class HeadTPPlan:
 class HeadTPStep:
     """Plans visible to every DP rank for this step.
 
-    ``active`` is true when any rank has a plan in ``active``. Every rank must
-    see the same value, because Full Attention then does a point-to-point
-    exchange before the expert-parallel collective.
+    ``active`` is true when any rank has a plan in ``pending_load`` or
+    ``active``. Every rank must see the same value. Only ``active`` plans
+    exchange attention; ``pending_load`` still runs local attention, but the
+    flag keeps every rank on that same forward path.
     """
 
     plans: dict[str, HeadTPPlan] = field(default_factory=dict)
@@ -117,6 +118,9 @@ def register_head_tp_partial_cache(req_id: str, cache: HeadTPPartialCache) -> No
 
 def drop_head_tp_partial_cache(req_id: str) -> None:
     _PARTIAL_CACHES.pop(req_id, None)
+    prefix = f"{req_id}/"
+    for key in [key for key in _PARTIAL_CACHES if key.startswith(prefix)]:
+        _PARTIAL_CACHES.pop(key, None)
 
 
 def head_tp_partial_caches() -> dict[str, HeadTPPartialCache]:
@@ -476,3 +480,93 @@ def prepare_head_tp_batch(
         local_attn_metadata=local_metadata,
         local_slot_mapping=local_slots,
     )
+
+
+class _HeadTPCopy:
+    """One owner's in-flight KV copy. ``inflight_end`` is None when idle."""
+
+    def __init__(self, visible_len: int) -> None:
+        self.visible_len = visible_len
+        self.copied_until = 0
+        self.inflight_end: int | None = None
+        self.failed = False
+
+
+class HeadTPLoadTracker:
+    """Track pending KV copies. The byte copy itself is not started here.
+
+    ``observe`` opens the next span. ``mark_copy_done`` closes it. A request
+    is caught up only when no span is in flight and the copied length has
+    reached both ``visible_len`` and the owner's committed length.
+    """
+
+    def __init__(self, rank: int) -> None:
+        self.rank = rank
+        self._copies: dict[str, _HeadTPCopy] = {}
+        self._held: set[str] = set()
+
+    def pending_span(self, req_id: str) -> tuple[int, int] | None:
+        copy = self._copies.get(req_id)
+        if copy is None or copy.inflight_end is None:
+            return None
+        return copy.copied_until, copy.inflight_end
+
+    def mark_copy_done(self, req_id: str, up_to: int, *, ok: bool = True) -> None:
+        copy = self._copies.get(req_id)
+        if copy is None:
+            return
+        copy.inflight_end = None
+        if not ok:
+            copy.failed = True
+            return
+        copy.copied_until = up_to
+
+    def release(self, req_ids: set[str] | list[str]) -> None:
+        for req_id in req_ids:
+            self._copies.pop(req_id, None)
+            self._held.discard(req_id)
+            drop_head_tp_partial_cache(req_id)
+
+    def observe(
+        self, step: HeadTPStep | None, owner_lens: dict[str, int]
+    ) -> tuple[list[str], list[str]]:
+        participants: set[str] = set()
+        owner_pending: set[str] = set()
+        if step is not None:
+            for req_id, plan in step.plans.items():
+                if any(shard.rank == self.rank for shard in plan.shards):
+                    participants.add(req_id)
+                if plan.owner_rank == self.rank and plan.state == "pending_load":
+                    owner_pending.add(req_id)
+                    copy = self._copies.get(req_id)
+                    if copy is None:
+                        copy = _HeadTPCopy(plan.visible_len)
+                        self._copies[req_id] = copy
+        caught: list[str] = []
+        failed: list[str] = []
+        for req_id in owner_pending:
+            copy = self._copies[req_id]
+            if copy.failed:
+                failed.append(req_id)
+                continue
+            owner_len = owner_lens.get(req_id, copy.visible_len)
+            if copy.inflight_end is not None:
+                continue
+            if copy.copied_until < copy.visible_len:
+                copy.inflight_end = copy.visible_len
+            elif copy.copied_until < owner_len:
+                copy.inflight_end = owner_len
+            else:
+                caught.append(req_id)
+        for req_id in list(self._copies):
+            if req_id not in owner_pending:
+                self._copies.pop(req_id, None)
+        for req_id in caught + failed:
+            self._copies.pop(req_id, None)
+        for req_id in failed:
+            participants.discard(req_id)
+            drop_head_tp_partial_cache(req_id)
+        for req_id in self._held - participants:
+            drop_head_tp_partial_cache(req_id)
+        self._held = participants
+        return caught, failed

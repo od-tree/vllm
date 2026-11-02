@@ -310,6 +310,15 @@ class ModelRunnerOutput:
     # ``None`` when ``return_sampling_mask`` is off.
     sampling_masks: SamplingMaskLists | None = None
 
+    # Head collaboration. The owner worker reports loads that caught up or
+    # failed. ``head_tp_attn_us`` is that rank's last attention time, or 0
+    # when it was not measured.
+    head_tp_caught_up: list[str] = field(default_factory=list)
+    head_tp_failed: list[str] = field(default_factory=list)
+    head_tp_attn_us: int = 0
+    # req_id -> bytes written by that request's helpers on this step.
+    head_tp_bytes_copied: dict[str, int] = field(default_factory=dict)
+
     @staticmethod
     def with_kv_conn_output_only(
         kv_connector_output: KVConnectorOutput | None,

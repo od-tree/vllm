@@ -1473,6 +1473,11 @@ class Worker(WorkerBase):
             and self.parallel_config.data_parallel_size > 1
         )
 
+    def set_head_tp_idle_step(self, step: Any) -> None:
+        """Give an idle worker the step the scheduler just gathered."""
+
+        self.model_runner._head_tp_idle_step = step
+
     def execute_dummy_batch(self) -> None:
         num_tokens = getattr(self.model_runner, "uniform_decode_query_len", 1)
         self.model_runner._dummy_run(

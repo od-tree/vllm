@@ -3,7 +3,7 @@
 import itertools
 import time
 from collections import defaultdict, deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 from typing import Any
 
@@ -56,6 +56,12 @@ from vllm.v1.core.sched.request_queue import (
 )
 from vllm.v1.core.sched.utils import check_stop, remove_all
 from vllm.v1.engine import EngineCoreEventType, EngineCoreOutput, EngineCoreOutputs
+from vllm.v1.head_tp_sched import (
+    HeadTPProfile,
+    LengthBucketEMA,
+    RECHECK_INTERVAL,
+    exchange_head_tp_step,
+)
 from vllm.v1.kv_cache_interface import (
     KVCacheConfig,
     MambaSpec,
@@ -497,6 +503,180 @@ class Scheduler(SchedulerInterface):
             {} if self.log_stats and self.connector is not None else None
         )
         self._kv_fetch_counts: dict[str, int] = dict.fromkeys(KV_FETCH_STAGES, 0)
+        self._init_head_tp()
+
+    def _init_head_tp(self) -> None:
+        """Enable head collaboration only for a hybrid model on 2 or more DP ranks."""
+
+        text = self.vllm_config.model_config.hf_text_config
+        num_q = int(getattr(text, "num_attention_heads", 0) or 0)
+        num_kv = int(getattr(text, "num_key_value_heads", 0) or 0)
+        layer_types = getattr(text, "layer_types", None) or ()
+        full_layers = sum(layer == "full_attention" for layer in layer_types)
+        dp_size = self.parallel_config.data_parallel_size
+        self._head_tp_num_q = num_q
+        self._head_tp_num_kv = num_kv
+        self._head_tp_rank = self.parallel_config.data_parallel_rank
+        self._head_tp_dp_size = dp_size
+        self._head_tp_profile = HeadTPProfile()
+        self._head_tp_lengths = LengthBucketEMA()
+        self._head_tp_attn_us = 0
+        self._head_tp_wire = None
+        self._head_tp_published = False
+        self._head_tp_prefix = None
+        self._head_tp_idle_step = None
+        self.head_tp_copied_bytes: dict[str, int] = {}
+        self.head_tp_cpu_lookup: Callable[[Request], int | None] | None = None
+        heads_divide = num_kv > 0 and num_q % num_kv == 0
+        self.head_tp_sync_enabled = (
+            dp_size >= 2 and num_kv >= 2 and full_layers > 0 and heads_divide
+        )
+
+    def attach_head_tp_wire(self, wire: object) -> None:
+        self._head_tp_wire = wire
+
+    def set_head_tp_profile(self, profile: HeadTPProfile) -> None:
+        self._head_tp_profile = profile
+
+    def set_head_tp_cpu_prefix(self, prefix: Any | None) -> None:
+        """Attach the replicated CPU prefix layer, or clear it.
+
+        ``prefix`` provides ``lookup_hit_tokens``, ``pin``, ``unpin``, and
+        ``pinned_request_ids``. Without it, ``kv_source`` stays ``gpu_copy``
+        or ``none``.
+        """
+
+        self._head_tp_prefix = prefix
+        lookup = None if prefix is None else prefix.lookup_hit_tokens
+        self.head_tp_cpu_lookup = lookup
+
+    def join_idle_head_tp(self) -> None:
+        """Enter the head-tp collectives on a rank that did not call ``schedule``."""
+
+        if not self.head_tp_sync_enabled or self._head_tp_wire is None:
+            return
+        if self._head_tp_published:
+            self._head_tp_published = False
+            return
+        self._head_tp_idle_step = self._exchange_head_tp({})
+
+    def take_head_tp_idle_step(self):
+        """Return the step gathered by an idle rank, once."""
+
+        step = self._head_tp_idle_step
+        self._head_tp_idle_step = None
+        return step
+
+    def _exchange_head_tp(self, scheduled_tokens: dict[str, int]):
+        if self._head_tp_wire is None:
+            logger.warning_once(
+                "Head collaboration is enabled but this engine has no DP "
+                "group; requests stay on local attention."
+            )
+            return None
+        cpu_hits: dict[str, int | None] = {}
+        gpu_blocks: dict[str, bool] = {}
+        lookup = self.head_tp_cpu_lookup
+        for request in self.requests.values():
+            req_id = request.request_id
+            cpu_hits[req_id] = None if lookup is None else lookup(request)
+            block_ids = self.kv_cache_manager.get_block_ids(req_id)
+            gpu_blocks[req_id] = any(block_ids)
+        free_blocks = self.kv_cache_manager.block_pool.get_num_free_blocks()
+        step = exchange_head_tp_step(
+            self.requests,
+            scheduled_tokens,
+            rank=self._head_tp_rank,
+            dp_size=self._head_tp_dp_size,
+            num_q_heads=self._head_tp_num_q,
+            num_kv_heads=self._head_tp_num_kv,
+            block_size=self.block_size,
+            partner_queue_limit=self.max_num_running_reqs,
+            profile=self._head_tp_profile,
+            lengths=self._head_tp_lengths,
+            local_stats=(free_blocks, len(self.running), self._head_tp_attn_us),
+            wire=self._head_tp_wire,
+            cpu_hit_tokens=cpu_hits,
+            has_gpu_blocks=gpu_blocks,
+            max_plans=self.max_num_running_reqs,
+        )
+        self._sync_head_tp_pins()
+        return step
+
+    def _apply_head_tp_report(
+        self,
+        scheduler_output: SchedulerOutput,
+        model_runner_output: ModelRunnerOutput,
+    ) -> None:
+        attn_us = model_runner_output.head_tp_attn_us
+        if attn_us > 0:
+            self._head_tp_attn_us = attn_us
+        for req_id, nbytes in model_runner_output.head_tp_bytes_copied.items():
+            self.head_tp_copied_bytes[req_id] = (
+                self.head_tp_copied_bytes.get(req_id, 0) + int(nbytes)
+            )
+        if not self.head_tp_sync_enabled:
+            return
+        caught = set(model_runner_output.head_tp_caught_up)
+        failed = set(model_runner_output.head_tp_failed)
+        step = scheduler_output.head_tp_step
+        for req_id, num_tokens in scheduler_output.num_scheduled_tokens.items():
+            request = self.requests.get(req_id)
+            if request is None:
+                continue
+            if req_id in failed:
+                self._reset_head_tp_request(request)
+                request.head_tp_next_check_tokens = (
+                    request.num_computed_tokens + RECHECK_INTERVAL
+                )
+                continue
+            ran_active = False
+            if step is not None and req_id in step.plans:
+                published = step.plans[req_id]
+                ran_active = (
+                    published.state == "active"
+                    and published.owner_rank == self._head_tp_rank
+                )
+            plan = request.head_tp_plan
+            if (
+                req_id in caught
+                and plan is not None
+                and plan.state == "pending_load"
+            ):
+                plan.state = "active"
+            if ran_active:
+                request.head_tp_collab_tokens += num_tokens
+
+    def _reset_head_tp_request(self, request: Request) -> None:
+        request.head_tp_plan = None
+        request.head_tp_collab_tokens = 0
+        request.head_tp_next_check_tokens = 0
+        request.prefix_cpu_hit_tokens = 0
+        request.predicted_remaining = None
+        self._sync_head_tp_pins()
+
+    def _sync_head_tp_pins(self) -> None:
+        prefix = self._head_tp_prefix
+        if prefix is None:
+            return
+        live: set[str] = set()
+        for request in self.requests.values():
+            plan = request.head_tp_plan
+            if plan is not None and plan.kv_source == "cpu_pool":
+                live.add(request.request_id)
+                prefix.pin(request)
+        for req_id in list(prefix.pinned_request_ids()):
+            if req_id not in live:
+                prefix.unpin(req_id)
+
+    def _head_tp_on_finished(self, request: Request) -> None:
+        if request.status in (
+            RequestStatus.FINISHED_STOPPED,
+            RequestStatus.FINISHED_LENGTH_CAPPED,
+            RequestStatus.FINISHED_REPETITION,
+        ):
+            self._head_tp_lengths.observe(request)
+        self._reset_head_tp_request(request)
 
     def _drafts_unused(
         self, request: Request, num_computed_tokens: int, num_new_tokens: int
@@ -1721,6 +1901,12 @@ class Scheduler(SchedulerInterface):
                 scheduled_encoder_inputs
             )
 
+        if self.head_tp_sync_enabled:
+            self._head_tp_published = True
+            head_tp_step = self._exchange_head_tp(num_scheduled_tokens)
+        else:
+            head_tp_step = None
+
         scheduler_output = SchedulerOutput(
             scheduled_new_reqs=new_reqs_data,
             scheduled_cached_reqs=cached_reqs_data,
@@ -1746,6 +1932,7 @@ class Scheduler(SchedulerInterface):
             num_spec_tokens_to_schedule=num_spec_tokens_to_schedule,
             skip_drafts=not drafts_needed,
             ec_manager_metadata=self.encoder_cache_manager.get_manager_metadata(),
+            head_tp_step=head_tp_step,
         )
 
         # NOTE(Kuntai): this function is designed for multiple purposes:
@@ -1811,6 +1998,7 @@ class Scheduler(SchedulerInterface):
         assert request.status == RequestStatus.RUNNING, (
             "Only running requests can be preempted"
         )
+        self._reset_head_tp_request(request)
         if self.aux_output_connector is not None:
             self.aux_output_connector.request_finished(request)
         self._free_request_blocks(request)
@@ -2254,6 +2442,7 @@ class Scheduler(SchedulerInterface):
         scheduler_output: SchedulerOutput,
         model_runner_output: ModelRunnerOutput,
     ) -> dict[int, EngineCoreOutputs]:
+        self._apply_head_tp_report(scheduler_output, model_runner_output)
         sampled_token_ids = model_runner_output.sampled_token_ids
         logprobs = model_runner_output.logprobs
         prompt_logprobs_dict = model_runner_output.prompt_logprobs_dict
@@ -3022,6 +3211,7 @@ class Scheduler(SchedulerInterface):
         self, request: Request, delay_free_blocks: bool = False
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         assert request.is_finished()
+        self._head_tp_on_finished(request)
 
         if self.aux_output_connector is not None:
             self.aux_output_connector.request_finished(request)

@@ -538,6 +538,7 @@ class Qwen3NextAttention(nn.Module):
             cache=self.attn.kv_cache,
             local_metadata=ctx.head_tp_local_attn_metadata,
             local_slot_mapping=ctx.head_tp_local_slot_mapping,
+            layer_name=self.attn.layer_name,
         )
 
 

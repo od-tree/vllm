@@ -285,6 +285,35 @@ def _slice_heads(
     return selected[:, start:end, :]
 
 
+def _partial_for(batch: HeadTPBatch, req_id: str, layer_name: str):
+    if layer_name:
+        found = batch.partial_caches.get(f"{req_id}/{layer_name}")
+        if found is not None:
+            return found
+    return batch.partial_caches.get(req_id)
+
+
+def _helper_slots(
+    partial: Any,
+    num_rows: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, int]:
+    """Slots for the new rows.
+
+    A pre-sized mapping is the history length including those rows. A cache
+    filled by the prefix load stores only the history, so the new rows start
+    at ``seq_len``.
+    """
+
+    if partial.slot_mapping.shape[0] == num_rows:
+        return partial.slot_mapping, partial.seq_len
+    history = partial.seq_len
+    slots = torch.arange(
+        history, history + num_rows, dtype=torch.int64, device=device
+    )
+    return slots, history + num_rows
+
+
 def _visible_seq_lens(
     seq_len: int, num_rows: int, device: torch.device
 ) -> torch.Tensor:
@@ -372,6 +401,7 @@ def run_mixed_head_attention(
     local_metadata: Any,
     local_slot_mapping: dict[str, torch.Tensor] | None,
     transport: HeadTPTransport | None = None,
+    layer_name: str = "",
 ) -> torch.Tensor:
     """Local rows use ``local_attn``. Owner rows keep shard 0 and collect the rest.
 
@@ -462,19 +492,15 @@ def run_mixed_head_attention(
     ) -> torch.Tensor:
         plan = step.plans[req_id]
         shard = plan.shards[shard_index]
-        partial = batch.partial_caches.get(req_id)
+        partial = _partial_for(batch, req_id, layer_name)
         if partial is None:
             raise RuntimeError(
                 f"rank {batch.rank} has no KV cache for helper request {req_id}"
             )
-        if partial.slot_mapping.shape[0] != q_part.shape[0]:
-            raise RuntimeError(
-                f"{req_id}: helper slots {partial.slot_mapping.shape[0]} "
-                f"do not match {q_part.shape[0]} rows"
-            )
+        slots, visible_end = _helper_slots(partial, q_part.shape[0], q_part.device)
         write_kv_range(
             partial.cache,
-            partial.slot_mapping,
+            slots,
             k_part,
             v_part,
             shard.kv_range,
@@ -485,13 +511,11 @@ def run_mixed_head_attention(
         return eager_gqa_decode(
             q_part,
             partial.cache,
-            partial.slot_mapping,
+            slots,
             shard.kv_range,
             scale,
             block_table=partial.block_table,
-            seq_lens=_visible_seq_lens(
-                partial.seq_len, q_part.shape[0], q_part.device
-            ),
+            seq_lens=_visible_seq_lens(visible_end, q_part.shape[0], q_part.device),
             num_kv_heads=num_kv_heads,
             head_dim=head_dim,
             block_size=batch.block_size,

@@ -76,6 +76,8 @@ def test_inactive_step_stays_on_local_attention():
     assert request.head_tp_plan is None
     assert request.predicted_remaining is None
     assert request.prefix_cpu_hit_tokens == 0
+    assert request.head_tp_next_check_tokens == 0
+    assert request.head_tp_collab_tokens == 0
     assert SchedulerOutput.make_empty().head_tp_step is None
 
 

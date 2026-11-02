@@ -119,7 +119,13 @@ from vllm.v1.worker.gpu.cudagraph_utils import (
 from vllm.v1.worker.gpu.dp_utils import DPSyncState, dispatch_cg_and_sync_dp
 from vllm.v1.worker.gpu.ec_connector import get_ec_connector
 from vllm.v1.worker.gpu.eplb_utils import EPLBController, step_eplb_after
-from vllm.v1.worker.gpu.head_tp import prepare_head_tp_forward
+from vllm.v1.worker.gpu.head_tp import (
+    head_tp_is_active,
+    observe_head_tp_loads,
+    prepare_head_tp_forward,
+    release_head_tp_loads,
+    run_prefix_loads,
+)
 from vllm.v1.worker.gpu.input_batch import (
     InputBatch,
     InputBuffers,
@@ -917,6 +923,13 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         dummy_scheduler_output = SchedulerOutput.make_empty()
         dummy_scheduler_output.total_num_scheduled_tokens = num_tokens
         dummy_scheduler_output.num_scheduled_tokens = num_scheduled_tokens
+        idle_step = getattr(self, "_head_tp_idle_step", None)
+        ran_idle_prefix = idle_step is not None and not is_profile and not skip_attn
+        if ran_idle_prefix:
+            dummy_scheduler_output.head_tp_step = idle_step
+            self._head_tp_report = observe_head_tp_loads(self, dummy_scheduler_output)
+            self._head_tp_bytes = run_prefix_loads(self, idle_step)
+        self._head_tp_idle_step = None
 
         # Disable any use of KVConnector for dummy runs.
         self.kv_connector.set_disabled(True)
@@ -946,6 +959,11 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 valid_dummy_state_slots=valid_dummy_state_slots,
                 randomize_inputs=randomize_inputs,
             )
+        if ran_idle_prefix:
+            # The tracker already recorded the copy. This dummy step has no
+            # scheduler output, so the report must not leak into the next one.
+            self._head_tp_report = ([], [])
+            self._head_tp_bytes = {}
         self.kv_connector.set_disabled(False)
 
         # Non-last PP ranks don't produce output for sampling.
@@ -1228,6 +1246,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # from the slot index.
         for req_id in sorted(finished_req_ids):
             self._remove_request(req_id)
+        release_head_tp_loads(self, finished_req_ids)
 
     def free_states(self, scheduler_output: SchedulerOutput) -> None:
         if self.encoder_cache is not None:
@@ -1812,6 +1831,10 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 for req_id, updates in scheduler_output.encoder_input_updates.items():
                     self.encoder_cache.update_encoder_inputs(req_id, updates)
             self.block_tables.apply_staged_writes()
+            self._head_tp_report = observe_head_tp_loads(self, scheduler_output)
+            self._head_tp_bytes = run_prefix_loads(
+                self, scheduler_output.head_tp_step
+            )
             if self.aux_output_connector is not None:
                 # Register this step before the GPU forward.
                 self.aux_output_connector.begin_step(
@@ -1820,9 +1843,18 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             if scheduler_output.total_num_scheduled_tokens == 0:
                 # No need to run the model.
                 empty_output = self.kv_connector.no_forward(scheduler_output)
-                return self._merge_ec_connector_no_forward(
+                empty_output = self._merge_ec_connector_no_forward(
                     scheduler_output, empty_output
                 )
+                caught_up, failed = self._head_tp_report
+                empty_output.head_tp_caught_up = list(caught_up)
+                empty_output.head_tp_failed = list(failed)
+                empty_output.head_tp_bytes_copied = dict(
+                    getattr(self, "_head_tp_bytes", {})
+                )
+                self._head_tp_report = ([], [])
+                self._head_tp_bytes = {}
+                return empty_output
 
         # Get batch descriptor and sync across DP ranks.
         num_reqs = len(scheduler_output.num_scheduled_tokens)
@@ -2072,7 +2104,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.model_config, input_batch.num_tokens, ubatch_slices
         )
 
-        if dummy_run:
+        if dummy_run and not head_tp_is_active(scheduler_output.head_tp_step):
             head_tp = None
         else:
             head_tp = prepare_head_tp_forward(
@@ -2298,6 +2330,14 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             prompt_token_id_logprobs_dict=prompt_token_id_logprobs_dict,
             cudagraph_stats=cudagraph_stats,
         )
+        caught_up, failed = getattr(self, "_head_tp_report", ([], []))
+        model_runner_output.head_tp_caught_up = list(caught_up)
+        model_runner_output.head_tp_failed = list(failed)
+        model_runner_output.head_tp_bytes_copied = dict(
+            getattr(self, "_head_tp_bytes", {})
+        )
+        self._head_tp_report = ([], [])
+        self._head_tp_bytes = {}
         pending_aux_output = None
         if self.aux_output_connector is not None:
             pending_aux_output = self.aux_output_connector.prepare_output(input_batch)
