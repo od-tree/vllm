@@ -67,7 +67,10 @@ from vllm.v1.kv_offload.base import (
 )
 from vllm.v1.kv_offload.config import OffloadingConfig
 from vllm.v1.kv_offload.cpu.gpu_worker import CPUOffloadingWorker
-from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
+from vllm.v1.kv_offload.cpu.shared_offload_region import (
+    SharedOffloadRegion,
+    shared_region_engine_id,
+)
 from vllm.v1.kv_offload.cpu.spec import CPUOffloadingSpec
 from vllm.v1.kv_offload.tiering.base import (
     TIER_LABEL,
@@ -379,10 +382,11 @@ class TieringOffloadingSpec(CPUOffloadingSpec):
         # False when some layers use the opaque fallback (exact-topology only)
         self.all_layers_portable: bool | None = None
 
-        # engine_id is unique per DP replica (suffixed with _dp{rank} in both
-        # the Ray and multiprocessing paths), so it names a per-replica offload
-        # region.
-        self._engine_id = config.engine_id
+        # The connector id stays suffixed per DP rank. A replicated region
+        # drops that suffix so the mmap file is shared inside the node.
+        self._engine_id = shared_region_engine_id(
+            config.engine_id, replicated=self.replicated_layout
+        )
 
     @override
     def get_manager(self) -> OffloadingManager:

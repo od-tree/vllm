@@ -204,6 +204,14 @@ class CPUOffloadingManager(OffloadingManager):
             return LookupResult.HIT_PENDING
         return LookupResult.HIT
 
+    def ready_chunk_id(self, key: OffloadKey) -> int | None:
+        """Physical CPU slot of a ready chunk. Caller holds ``lock``."""
+
+        chunk = self._policy.get(key)
+        if chunk is None or not chunk.is_ready:
+            return None
+        return int(chunk.chunk_id)
+
     @override
     def get_load_source(
         self, key: OffloadKey, req_context: ReqContext

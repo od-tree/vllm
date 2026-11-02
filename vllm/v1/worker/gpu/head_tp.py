@@ -146,6 +146,7 @@ def run_prefix_loads(runner: Any, step: HeadTPStep | None) -> dict[str, int]:
     sources: dict[str, dict[str, torch.Tensor]] = {
         "gpu_copy": gpu_caches,
     }
+    _ensure_cpu_pool_source(runner)
     extra = getattr(runner, "_head_tp_kv_sources", None) or {}
     for name, caches in extra.items():
         sources[name] = caches
@@ -167,6 +168,34 @@ def run_prefix_loads(runner: Any, step: HeadTPStep | None) -> dict[str, int]:
         head_dim=head_dim,
         block_size=block_size,
     )
+
+
+def _ensure_cpu_pool_source(runner: Any) -> None:
+    extra = getattr(runner, "_head_tp_kv_sources", None) or {}
+    if "cpu_pool" in extra:
+        return
+    caches = _connector_cpu_caches()
+    if caches:
+        register_head_tp_kv_source(runner, "cpu_pool", caches)
+
+
+def _connector_cpu_caches() -> dict[str, torch.Tensor] | None:
+    try:
+        from vllm.distributed.kv_transfer import (
+            get_kv_transfer_group,
+            has_kv_transfer_group,
+        )
+
+        if not has_kv_transfer_group():
+            return None
+        group = get_kv_transfer_group()
+    except Exception:
+        return None
+    worker = getattr(group, "connector_worker", None)
+    caches = getattr(worker, "head_tp_cpu_caches", None)
+    if not caches:
+        return None
+    return caches
 
 
 def _prefix_transport(runner: Any):
@@ -217,6 +246,11 @@ def _owner_block_ids(
     ids: dict[str, list[int]] = {}
     for req_id, plan in step.plans.items():
         if plan.owner_rank != runner.dp_rank or plan.state != "pending_load":
+            continue
+        if plan.kv_source == "cpu_pool":
+            cpu_ids = getattr(step, "cpu_block_ids", {}).get(req_id)
+            if cpu_ids:
+                ids[req_id] = [int(block) for block in cpu_ids]
             continue
         if req_id in override:
             ids[req_id] = [int(block) for block in override[req_id]]

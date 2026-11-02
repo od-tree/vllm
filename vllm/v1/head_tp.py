@@ -67,6 +67,9 @@ class HeadTPStep:
 
     plans: dict[str, HeadTPPlan] = field(default_factory=dict)
     active: bool = False
+    # Owner-only. CPU chunk slots for ``cpu_pool``, not GPU block ids.
+    # Not part of the allgather; the owner sends them in the copy header.
+    cpu_block_ids: dict[str, list[int]] = field(default_factory=dict)
 
 
 @dataclass

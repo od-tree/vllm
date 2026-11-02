@@ -18,12 +18,14 @@ from vllm.v1.head_tp import (
 )
 from vllm.v1.head_tp_kv import (
     CPUPrefixLayer,
+    attention_block_view,
     exchange_prefix_loads,
     load_kv_range,
 )
 from vllm.v1.head_tp_sched import select_kv_source
 from vllm.v1.kv_offload.base import ReqContext, make_offload_key
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
+from vllm.v1.kv_offload.cpu.shared_offload_region import shared_region_engine_id
 from vllm.v1.request import Request
 
 
@@ -117,6 +119,7 @@ def test_cpu_prefix_hit_pins_only_a_replicated_ready_prefix():
     assert select_kv_source(16, 32, True) == ("gpu_copy", 0)
     manager.complete_store(stored.keys_to_store[1:], ctx)
     assert ready.lookup_hit_tokens(request) == 32
+    assert ready.source_block_ids(request) == [0, 1]
     assert select_kv_source(32, 32, True) == ("cpu_pool", 32)
     assert closed.lookup_hit_tokens(request) is None
 
@@ -217,3 +220,24 @@ def _exchange(kv_source: str) -> None:
 def test_exchange_writes_the_helper_cache_and_reports_bytes():
     _exchange("gpu_copy")
     _exchange("cpu_pool")
+
+
+def test_padded_cpu_pages_view_as_attention_blocks():
+    example = _cache(2, "flash")
+    block_bytes = example[0].numel() * example.element_size()
+    pad = 16
+    row = block_bytes + pad
+    storage = torch.zeros(2 * row, dtype=torch.int8)
+    pages = torch.as_strided(storage, (2, block_bytes), (row, 1))
+    raw = example[0].contiguous().view(torch.int8).reshape(-1)
+    pages[1, : raw.numel()] = raw
+    viewed = attention_block_view(pages, example, 1)
+    assert tuple(viewed.shape) == (2, *example.shape[1:])
+    assert torch.equal(viewed[1], example[0])
+    assert torch.equal(viewed[0], torch.zeros_like(viewed[0]))
+
+
+def test_replicated_mmap_id_drops_only_the_dp_suffix():
+    assert shared_region_engine_id("engine_dp3", replicated=True) == "engine"
+    assert shared_region_engine_id("engine_dp3", replicated=False) == "engine_dp3"
+    assert shared_region_engine_id("engine", replicated=True) == "engine"

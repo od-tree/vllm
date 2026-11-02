@@ -20,7 +20,10 @@ from vllm.v1.kv_offload.config import OffloadingConfig
 from vllm.v1.kv_offload.cpu.common import CPUOffloadingInfo, CPUOffloadingMetrics
 from vllm.v1.kv_offload.cpu.gpu_worker import CPUOffloadingWorker
 from vllm.v1.kv_offload.cpu.manager import CPUOffloadingManager
-from vllm.v1.kv_offload.cpu.shared_offload_region import SharedOffloadRegion
+from vllm.v1.kv_offload.cpu.shared_offload_region import (
+    SharedOffloadRegion,
+    shared_region_engine_id,
+)
 
 # Split the shared region into this many shm files so workers pre-fault them
 # in parallel (page-cache inserts are serialized per file).
@@ -191,7 +194,9 @@ class CPUOffloadingSpec(OffloadingSpec):
             worker_index = self.config.parallel.rank
 
             mmap_region = SharedOffloadRegion(
-                engine_id=self.config.engine_id,
+                engine_id=shared_region_engine_id(
+                    self.config.engine_id, replicated=self.replicated_layout
+                ),
                 num_chunks=self.num_chunks,
                 rank=0 if self.replicated_layout else worker_index,
                 kv_bytes_per_chunk=self.kv_bytes_per_chunk,

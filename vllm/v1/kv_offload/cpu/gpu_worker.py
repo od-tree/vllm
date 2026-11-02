@@ -925,6 +925,7 @@ class CPUOffloadingWorker(OffloadingWorker):
 
             gpu_tensors.append(gpu_tensor)
             cpu_tensors.append(cpu_tensor)
+        self.cpu_tensors = cpu_tensors
 
         make_handler = functools.partial(
             SingleDirectionOffloadingHandler,

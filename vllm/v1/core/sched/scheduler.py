@@ -600,8 +600,29 @@ class Scheduler(SchedulerInterface):
             has_gpu_blocks=gpu_blocks,
             max_plans=self.max_num_running_reqs,
         )
+        self._attach_head_tp_cpu_blocks(step)
         self._sync_head_tp_pins()
         return step
+
+    def _attach_head_tp_cpu_blocks(self, step) -> None:
+        """Record the owner's CPU block ids. They are not allgathered."""
+
+        if step is None:
+            return
+        prefix = self._head_tp_prefix
+        if prefix is None or not hasattr(prefix, "source_block_ids"):
+            return
+        found: dict[str, list[int]] = {}
+        for req_id, plan in step.plans.items():
+            if plan.kv_source != "cpu_pool" or plan.owner_rank != self._head_tp_rank:
+                continue
+            request = self.requests.get(req_id)
+            if request is None:
+                continue
+            block_ids = prefix.source_block_ids(request)
+            if block_ids:
+                found[req_id] = block_ids
+        step.cpu_block_ids = found
 
     def _apply_head_tp_report(
         self,

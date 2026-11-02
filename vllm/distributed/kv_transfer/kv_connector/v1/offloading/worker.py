@@ -18,6 +18,7 @@ from vllm.distributed.kv_transfer.kv_connector.v1.offloading.config import (
     get_offloading_group_ids,
 )
 from vllm.logger import init_logger
+from vllm.v1.head_tp_kv import attention_block_view
 from vllm.v1.kv_cache_interface import (
     AttentionSpec,
     KVCacheConfig,
@@ -65,6 +66,7 @@ class OffloadingConnectorWorker:
             tuple[int, GPULoadStoreSpec, LoadStoreSpec]
         ] = []
         self._connector_worker_meta = OffloadingWorkerMetadata()
+        self.head_tp_cpu_caches: dict[str, torch.Tensor] = {}
 
     def _init_worker(self, kv_caches: CanonicalKVCaches) -> None:
         self.worker = self.spec.get_worker(kv_caches)
@@ -81,6 +83,7 @@ class OffloadingConnectorWorker:
 
         # layer_name -> (num_blocks, page_size_bytes) tensor
         tensors_per_block: dict[str, tuple[torch.Tensor, ...]] = {}
+        attn_layers: set[str] = set()
         # layer_name -> size of (un-padded) page in bytes
         unpadded_page_size_bytes: dict[str, int] = {}
         # layer_name -> size of page in bytes
@@ -121,6 +124,7 @@ class OffloadingConnectorWorker:
                 page_size_bytes[layer_name] = page
 
                 if isinstance(layer_kv_cache_spec, AttentionSpec):
+                    attn_layers.add(layer_name)
                     unpadded_page_size_bytes[layer_name] = (
                         layer_kv_cache_spec.unpadded_page_size_bytes
                     )
@@ -164,6 +168,7 @@ class OffloadingConnectorWorker:
 
         block_tensors: list[CanonicalKVCacheTensor] = []
         block_data_refs: dict[str, list[CanonicalKVCacheRef]] = defaultdict(list)
+        layer_tensor_idx: dict[str, int] = {}
         # Layers that alias the same bytes (cache groups overlay each other) share
         # one transfer region: exactly the views with equal address and strides.
         aliased_layers: dict[tuple[int, tuple[int, ...]], list[str]] = defaultdict(list)
@@ -195,6 +200,8 @@ class OffloadingConnectorWorker:
                         or mapping.local_page_size_bytes
                         == unpadded_page_size_bytes[layer_name]
                     )
+                    if layer_name not in layer_tensor_idx:
+                        layer_tensor_idx[layer_name] = curr_tensor_idx
                     block_data_refs[layer_name].append(
                         CanonicalKVCacheRef(
                             tensor_idx=curr_tensor_idx,
@@ -216,6 +223,44 @@ class OffloadingConnectorWorker:
         )
 
         self._init_worker(canonical_kv_caches)
+        self._publish_head_tp_cpu_views(kv_caches, layer_tensor_idx, attn_layers)
+
+    def _publish_head_tp_cpu_views(
+        self,
+        kv_caches: dict[str, torch.Tensor],
+        layer_tensor_idx: dict[str, int],
+        attn_layers: set[str],
+    ) -> None:
+        """Register a block-indexed view of the replicated CPU region.
+
+        Only attention layers are included. The view is not inserted into
+        the prefix hash. Packed layouts stay unregistered.
+        """
+
+        if not self.spec.replicated_layout:
+            return
+        pages = getattr(self.worker, "cpu_tensors", None)
+        if not pages:
+            return
+        blocks_per_chunk = int(self.spec.blocks_per_chunk)
+        caches: dict[str, torch.Tensor] = {}
+        for layer_name in attn_layers:
+            tensor_idx = layer_tensor_idx.get(layer_name)
+            example = kv_caches.get(layer_name)
+            if (
+                tensor_idx is None
+                or example is None
+                or example.ndim != 4
+                or tensor_idx >= len(pages)
+            ):
+                continue
+            try:
+                caches[layer_name] = attention_block_view(
+                    pages[tensor_idx], example, blocks_per_chunk
+                )
+            except ValueError:
+                continue
+        self.head_tp_cpu_caches = caches
 
     def handle_preemptions(self, kv_connector_metadata: OffloadingConnectorMetadata):
         assert self.worker is not None

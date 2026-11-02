@@ -6,6 +6,7 @@ import errno
 import functools
 import mmap
 import os
+import re
 import time
 from collections.abc import Callable, Iterator
 from ctypes import c_int, c_long, c_size_t, c_void_p
@@ -21,6 +22,22 @@ from vllm.utils.math_utils import cdiv, round_up
 from vllm.v1.kv_offload.cpu.host_register import host_unregister
 
 logger = init_logger(__name__)
+
+
+def shared_region_engine_id(engine_id: str, *, replicated: bool) -> str:
+    """File id for one shared offload region.
+
+    Data parallel appends ``_dp<rank>`` so connector registration stays unique.
+    A replicated region strips that one suffix, and every rank maps the same
+    file. The connector id itself is left unchanged.
+    """
+
+    if not replicated:
+        return engine_id
+    match = re.fullmatch(r"(.*)_dp\d+", engine_id)
+    if match is None or not match.group(1):
+        return engine_id
+    return match.group(1)
 
 # MADV_POPULATE_WRITE was added in Linux 5.14 (value 23).
 _MADV_POPULATE_WRITE = getattr(mmap, "MADV_POPULATE_WRITE", 23)

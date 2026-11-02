@@ -22,7 +22,6 @@ from vllm.v1.head_tp import (
     register_head_tp_partial_cache,
 )
 from vllm.v1.kv_offload.base import (
-    LookupResult,
     OffloadKey,
     ReqContext,
     make_offload_key,
@@ -150,6 +149,75 @@ def load_kv_range(
     return written
 
 
+def attention_block_view(
+    pages: torch.Tensor,
+    example: torch.Tensor,
+    blocks_per_chunk: int,
+) -> torch.Tensor:
+    """View chunk pages as attention blocks.
+
+    ``pages`` is int8 ``(num_chunks, blocks_per_chunk * page_bytes)``. Rows may
+    be strided when the mmap row is padded. ``example`` supplies the backend
+    shape and dtype. One block per chunk returns ``(num_chunks, *tail)``.
+    Several packed blocks return that same block axis when the row has no
+    padding, and ``(num_chunks, blocks_per_chunk, *tail)`` when it does.
+    """
+
+    if blocks_per_chunk <= 0:
+        raise ValueError(f"blocks_per_chunk {blocks_per_chunk} is not positive")
+    if pages.dtype != torch.int8 or pages.ndim != 2:
+        raise ValueError(f"cpu pages must be int8 rows, got {tuple(pages.shape)}")
+    if example.ndim != 4:
+        raise ValueError(f"kv cache must be rank 4, got {tuple(example.shape)}")
+    itemsize = example.element_size()
+    if pages.shape[1] % itemsize or pages.stride(0) % itemsize:
+        raise ValueError("cpu page is not aligned to the kv dtype")
+    viewed = pages.view(example.dtype)
+    tail = tuple(example.shape[1:])
+    tail_n = int(example.reshape(example.shape[0], -1).shape[1])
+    if tail_n <= 0 or tail_n * blocks_per_chunk > pages.shape[1] // itemsize:
+        raise ValueError(
+            f"page of {pages.shape[1]} bytes cannot hold "
+            f"{blocks_per_chunk} blocks of {tail_n * itemsize} bytes"
+        )
+    stride = 1
+    tail_strides: list[int] = []
+    for dim in reversed(tail):
+        tail_strides.append(stride)
+        stride *= int(dim)
+    tail_strides.reverse()
+    row_stride = int(viewed.stride(0))
+    if blocks_per_chunk == 1:
+        return torch.as_strided(
+            viewed,
+            (pages.shape[0], *tail),
+            (row_stride, *tail_strides),
+        )
+    if row_stride == blocks_per_chunk * tail_n:
+        return viewed.as_strided(
+            (pages.shape[0] * blocks_per_chunk, *tail),
+            (tail_n, *tail_strides),
+        )
+    return torch.as_strided(
+        viewed,
+        (pages.shape[0], blocks_per_chunk, *tail),
+        (row_stride, tail_n, *tail_strides),
+    )
+
+
+def take_attention_blocks(
+    cache: torch.Tensor, block_ids: Sequence[int]
+) -> torch.Tensor:
+    """Gather chunk-major rows into one block per requested id."""
+
+    if cache.ndim != 5:
+        return cache
+    blocks_per_chunk = int(cache.shape[1])
+    chunks = [block // blocks_per_chunk for block in block_ids]
+    subs = [block % blocks_per_chunk for block in block_ids]
+    return cache[chunks, subs]
+
+
 def ensure_partial_cache(
     req_id: str,
     example: torch.Tensor,
@@ -199,13 +267,22 @@ class CPUPrefixLayer:
         block_size: int,
         replicated: bool,
         group_idx: int = 0,
+        blocks_per_chunk: int = 1,
+        hashes_per_chunk: int | None = None,
     ) -> None:
         if block_size <= 0:
             raise ValueError(f"block size {block_size} is not positive")
+        if blocks_per_chunk <= 0:
+            raise ValueError(f"blocks_per_chunk {blocks_per_chunk} is not positive")
+        stride = blocks_per_chunk if hashes_per_chunk is None else hashes_per_chunk
+        if stride <= 0:
+            raise ValueError(f"hashes_per_chunk {stride} is not positive")
         self.manager = manager
         self.block_size = block_size
         self.replicated = replicated
         self.group_idx = group_idx
+        self.blocks_per_chunk = blocks_per_chunk
+        self.hashes_per_chunk = stride
         self._pinned: dict[str, list[OffloadKey]] = {}
         self._ctx: dict[str, ReqContext] = {}
 
@@ -213,27 +290,39 @@ class CPUPrefixLayer:
         return list(self._pinned)
 
     def lookup_hit_tokens(self, request: Request) -> int | None:
-        if not self.replicated or not request.block_hashes:
+        chunk_ids = self._ready_chunk_ids(request)
+        if chunk_ids is None:
             return None
-        ctx = self._context(request)
-        hits = 0
-        with self.manager.lock():
-            for block_hash in request.block_hashes:
-                key = make_offload_key(bytes(block_hash), self.group_idx)
-                if self.manager.lookup(key, ctx) is not LookupResult.HIT:
-                    break
-                hits += 1
-        return hits * self.block_size
+        return len(chunk_ids) * self.blocks_per_chunk * self.block_size
+
+    def source_block_ids(self, request: Request) -> list[int] | None:
+        """Block ids in the attention view, in token order.
+
+        A chunk of several GPU blocks occupies that many consecutive ids.
+        """
+
+        chunk_ids = self._ready_chunk_ids(request)
+        if not chunk_ids:
+            return None
+        ids: list[int] = []
+        span = self.blocks_per_chunk
+        for chunk_id in chunk_ids:
+            base = chunk_id * span
+            ids.extend(range(base, base + span))
+        return ids
 
     def pin(self, request: Request) -> None:
         if not self.replicated or request.request_id in self._pinned:
             return
+        hashes = self._chunk_hashes(request)
+        if not hashes:
+            return
         ctx = self._context(request)
         keys: list[OffloadKey] = []
         with self.manager.lock():
-            for block_hash in request.block_hashes:
+            for block_hash in hashes:
                 key = make_offload_key(bytes(block_hash), self.group_idx)
-                if self.manager.lookup(key, ctx) is not LookupResult.HIT:
+                if self.manager.ready_chunk_id(key) is None:
                     break
                 keys.append(key)
             if keys:
@@ -248,6 +337,29 @@ class CPUPrefixLayer:
             return
         with self.manager.lock():
             self.manager.complete_load(keys, ctx)
+
+    def _chunk_hashes(self, request: Request) -> list[Any] | None:
+        if not self.replicated or not request.block_hashes:
+            return None
+        hashes = list(request.block_hashes)
+        stride = self.hashes_per_chunk
+        if stride > 1:
+            hashes = hashes[stride - 1 :: stride]
+        return hashes
+
+    def _ready_chunk_ids(self, request: Request) -> list[int] | None:
+        hashes = self._chunk_hashes(request)
+        if hashes is None:
+            return None
+        ids: list[int] = []
+        with self.manager.lock():
+            for block_hash in hashes:
+                key = make_offload_key(bytes(block_hash), self.group_idx)
+                chunk_id = self.manager.ready_chunk_id(key)
+                if chunk_id is None:
+                    break
+                ids.append(chunk_id)
+        return ids
 
     def _context(self, request: Request) -> ReqContext:
         ctx = self._ctx.get(request.request_id)
@@ -507,18 +619,32 @@ def _helper_recv(
     src_ids = [int(block) for block in message.get("src_block_ids", ())]
     token_start = int(message["token_start"])
     local_ids = list(range(len(src_ids)))
+    gpu_caches = sources.get("gpu_copy")
+    device = None
+    if gpu_caches:
+        device = next(iter(gpu_caches.values())).device
     try:
         if message.get("kv_source") == "cpu_pool":
             source = sources.get("cpu_pool")
             if source is None:
                 raise KeyError("cpu prefix tensor is not registered")
-            src_block_ids: Sequence[int] = src_ids
+            sample = next(iter(source.values()), None)
+            if sample is not None and sample.ndim == 5:
+                source = {
+                    name: take_attention_blocks(tensor, src_ids)
+                    for name, tensor in source.items()
+                }
+                src_block_ids: Sequence[int] = local_ids
+            else:
+                src_block_ids = src_ids
         else:
             source = _layers_from_payload(message)
             if not source:
                 raise KeyError("gpu copy arrived without kv tensors")
             src_block_ids = local_ids
-        dest = _per_layer_dest(req_id, source, layers, token_end, block_size)
+        dest = _per_layer_dest(
+            req_id, source, layers, token_end, block_size, device
+        )
         nbytes = load_kv_range(
             source,
             dest,
@@ -550,14 +676,22 @@ def _per_layer_dest(
     layers: Sequence[str],
     num_tokens: int,
     block_size: int,
+    device: torch.device | None = None,
 ) -> dict[str, torch.Tensor]:
     """One private tensor per Full Attention layer, outside the prefix hash."""
 
     dest: dict[str, torch.Tensor] = {}
     for layer in layers:
+        example = source[layer]
+        if device is not None and example.device != device:
+            example = torch.empty(
+                (1, *example.shape[1:]),
+                dtype=example.dtype,
+                device=device,
+            )
         partial = ensure_partial_cache(
             f"{req_id}/{layer}",
-            source[layer],
+            example,
             num_tokens,
             block_size,
         )
