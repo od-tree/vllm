@@ -20,6 +20,7 @@ from vllm.v1.engine import (
     EngineCoreRequest,
     FinishReason,
 )
+from vllm.v1.head_tp import HeadTPPlan
 from vllm.v1.kv_hints import KvHintsEnvelope
 from vllm.v1.metrics.stats import PrefillStats, RequestSpecDecodeMetrics
 from vllm.v1.structured_output.request import StructuredOutputRequest
@@ -242,6 +243,13 @@ class Request:
         # If True, request should be aborted immediately after being added to
         # the scheduler so the connector's request_finished hook runs.
         self.abort_immediately = abort_immediately
+
+        # Head collaboration. Empty until the scheduler decides, once, at the
+        # first decode token. ``prefix_cpu_hit_tokens`` is filled when that
+        # decision reads the CPU prefix layer.
+        self.head_tp_plan: HeadTPPlan | None = None
+        self.predicted_remaining: int | None = None
+        self.prefix_cpu_hit_tokens: int = 0
 
     @classmethod
     def from_engine_core_request(

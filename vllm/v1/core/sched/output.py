@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from vllm.config.ec_manager_config import EncoderCacheManagerMetadata
 from vllm.multimodal.utils import strip_covered_mm_data
+from vllm.v1.head_tp import HeadTPStep
 
 if TYPE_CHECKING:
     import numpy as np
@@ -324,6 +325,9 @@ class SchedulerOutput:
     # drafter can skip proposing them.
     skip_drafts: bool = False
 
+    # Head collaboration for this step. None keeps every rank on local attention.
+    head_tp_step: HeadTPStep | None = None
+
     @classmethod
     def make_empty(cls) -> "SchedulerOutput":
         return cls(
@@ -335,6 +339,7 @@ class SchedulerOutput:
             scheduled_encoder_inputs={},
             finished_req_ids=set(),
             free_encoder_mm_hashes=[],
+            head_tp_step=None,
         )
 
 

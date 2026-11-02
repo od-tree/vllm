@@ -14,6 +14,7 @@ from vllm.config import CUDAGraphMode, ParallelConfig, VllmConfig
 from vllm.logger import init_logger
 from vllm.platforms import current_platform
 from vllm.v1.attention.backend import AttentionMetadata
+from vllm.v1.head_tp import HeadTPBatch, HeadTPStep
 from vllm.v1.worker.dp_utils import coordinate_batch_across_dp
 from vllm.v1.worker.ubatch_utils import UBatchSlices
 
@@ -196,6 +197,14 @@ class ForwardContext:
 
     additional_kwargs: dict[str, Any] = field(default_factory=dict)
 
+    # Head collaboration. Both stay None when the step is local, and the
+    # Full Attention forward then calls ``self.attn`` exactly as before.
+    # ``BatchDescriptor`` is intentionally unchanged: an active step runs eager.
+    head_tp_step: HeadTPStep | None = None
+    head_tp_local_attn_metadata: Any = None
+    head_tp_local_slot_mapping: dict[str, torch.Tensor] | None = None
+    head_tp_batch: HeadTPBatch | None = None
+
     def __post_init__(self):
         assert self.cudagraph_runtime_mode.is_valid_runtime_mode(), (
             f"Invalid cudagraph runtime mode: {self.cudagraph_runtime_mode}"
@@ -238,6 +247,10 @@ def create_forward_context(
     additional_kwargs: dict[str, Any] | None = None,
     skip_compiled: bool = False,
     is_padding: torch.Tensor | None = None,
+    head_tp_step: HeadTPStep | None = None,
+    head_tp_local_attn_metadata: Any = None,
+    head_tp_local_slot_mapping: dict[str, torch.Tensor] | None = None,
+    head_tp_batch: HeadTPBatch | None = None,
 ):
     if vllm_config.compilation_config.fast_moe_cold_start:
         all_moe_layers = vllm_config.compilation_config.static_all_moe_layers
@@ -256,6 +269,10 @@ def create_forward_context(
         skip_compiled=skip_compiled,
         additional_kwargs=additional_kwargs or {},
         is_padding=is_padding,
+        head_tp_step=head_tp_step,
+        head_tp_local_attn_metadata=head_tp_local_attn_metadata,
+        head_tp_local_slot_mapping=head_tp_local_slot_mapping,
+        head_tp_batch=head_tp_batch,
     )
 
 
@@ -286,6 +303,10 @@ def set_forward_context(
     slot_mapping: dict[str, torch.Tensor] | list[dict[str, torch.Tensor]] | None = None,
     skip_compiled: bool = False,
     is_padding: torch.Tensor | None = None,
+    head_tp_step: HeadTPStep | None = None,
+    head_tp_local_attn_metadata: Any = None,
+    head_tp_local_slot_mapping: dict[str, torch.Tensor] | None = None,
+    head_tp_batch: HeadTPBatch | None = None,
 ):
     """A context manager that stores the current forward context,
     can be attention metadata, etc.
@@ -353,6 +374,10 @@ def set_forward_context(
         additional_kwargs,
         skip_compiled,
         is_padding=is_padding,
+        head_tp_step=head_tp_step,
+        head_tp_local_attn_metadata=head_tp_local_attn_metadata,
+        head_tp_local_slot_mapping=head_tp_local_slot_mapping,
+        head_tp_batch=head_tp_batch,
     )
 
     try:

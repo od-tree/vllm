@@ -119,6 +119,7 @@ from vllm.v1.worker.gpu.cudagraph_utils import (
 from vllm.v1.worker.gpu.dp_utils import DPSyncState, dispatch_cg_and_sync_dp
 from vllm.v1.worker.gpu.ec_connector import get_ec_connector
 from vllm.v1.worker.gpu.eplb_utils import EPLBController, step_eplb_after
+from vllm.v1.worker.gpu.head_tp import prepare_head_tp_forward
 from vllm.v1.worker.gpu.input_batch import (
     InputBatch,
     InputBuffers,
@@ -2071,13 +2072,30 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.model_config, input_batch.num_tokens, ubatch_slices
         )
 
+        if dummy_run:
+            head_tp = None
+        else:
+            head_tp = prepare_head_tp_forward(
+                scheduler_output,
+                input_batch,
+                attn_metadata,
+                slot_mappings_by_layer,
+                block_tables,
+                self.attn_groups,
+                self.dp_rank,
+                self.dp_size,
+            )
+        head_tp_eager = head_tp is not None and head_tp.force_eager
+
         self.step_timing.record_batch(
-            input_batch, batch_desc.cg_mode == CUDAGraphMode.FULL
+            input_batch,
+            batch_desc.cg_mode == CUDAGraphMode.FULL and not head_tp_eager,
         )
         self.step_timing.forward_start()
 
-        # Run model.
-        if batch_desc.cg_mode == CUDAGraphMode.FULL:
+        # Run model. An active head-collaboration step stays eager: the Python
+        # branch in Full Attention cannot be replayed from a captured graph.
+        if batch_desc.cg_mode == CUDAGraphMode.FULL and not head_tp_eager:
             # Use explicit cudagraph replay for FULL mode.
             # NOTE(woosuk): Here, we don't need to pass the input tensors,
             # because they are already copied to the CUDA graph input buffers.
@@ -2098,17 +2116,29 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 attn_metadata,
                 self.vllm_config,
                 num_tokens=input_batch.num_tokens_after_padding,
-                cudagraph_runtime_mode=batch_desc.cg_mode,
+                cudagraph_runtime_mode=(
+                    CUDAGraphMode.NONE if head_tp_eager else batch_desc.cg_mode
+                ),
                 num_tokens_across_dp=dp_sync_state
                 and dp_sync_state.num_tokens_across_dp,
                 batch_descriptor=batch_descriptor,
                 ubatch_slices=ubatch_slices,
                 slot_mapping=slot_mappings_by_layer,
-                skip_compiled=skip_compiled,
+                skip_compiled=skip_compiled or head_tp_eager,
                 is_padding=input_batch.is_padding,
+                head_tp_step=None if head_tp is None else head_tp.step,
+                head_tp_local_attn_metadata=(
+                    None if head_tp is None else head_tp.local_attn_metadata
+                ),
+                head_tp_local_slot_mapping=(
+                    None if head_tp is None else head_tp.local_slot_mapping
+                ),
+                head_tp_batch=None if head_tp is None else head_tp.batch,
             ):
                 self.kv_connector.pre_forward(scheduler_output, input_batch)
-                if ubatch_state is not None:
+                if head_tp_eager:
+                    model_output = self.model(**model_inputs)
+                elif ubatch_state is not None:
                     assert self.ubatch_runner is not None
                     model_output = self.ubatch_runner.run(
                         self.model, model_inputs, ubatch_state

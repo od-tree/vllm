@@ -18,6 +18,10 @@ from vllm.distributed import (
     tensor_model_parallel_all_gather,
     tensor_model_parallel_reduce_scatter,
 )
+from vllm.forward_context import (
+    get_forward_context,
+    is_forward_context_available,
+)
 from vllm.kernels.triton.fused_sigmoid_gate_mul import fused_sigmoid_gate_mul
 from vllm.model_executor.layers.attention import Attention
 from vllm.model_executor.layers.fused_moe import (
@@ -32,6 +36,7 @@ from vllm.model_executor.layers.fusion.quant_activation import (
     QuantizedActivation,
     get_input_quant_key,
 )
+from vllm.model_executor.layers.head_tp_attn import run_mixed_head_attention
 from vllm.model_executor.layers.layernorm import (
     GemmaRMSNorm as Qwen3NextRMSNorm,
 )
@@ -67,6 +72,7 @@ from vllm.model_executor.models.utils import sequence_parallel_chunk
 from vllm.platforms import current_platform
 from vllm.sequence import IntermediateTensors
 from vllm.v1.attention.backend import AttentionType
+from vllm.v1.head_tp import head_tp_is_active
 
 from .interfaces import (
     EagleModelMixin,
@@ -474,7 +480,15 @@ class Qwen3NextAttention(nn.Module):
     ) -> torch.Tensor:
         qkv, _ = self.qkv_proj(hidden_states)
         q, k, v, gate = self._project_qkv_gate(qkv, positions)
-        attn_output = self.attn(q, k, v)
+        step = (
+            get_forward_context().head_tp_step
+            if is_forward_context_available()
+            else None
+        )
+        if not head_tp_is_active(step):
+            attn_output = self.attn(q, k, v)
+        else:
+            attn_output = self._mixed_head_attention(q, k, v)
         if gate is not None:
             if not self.use_fused_output_gate:
                 attn_output = attn_output * torch.sigmoid(gate)
@@ -492,6 +506,39 @@ class Qwen3NextAttention(nn.Module):
                 attn_output = fused_sigmoid_gate_mul(attn_output, gate)
         output, _ = self.o_proj(attn_output)
         return output
+
+    def _mixed_head_attention(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+    ) -> torch.Tensor:
+        """Split one batch into local rows and owner rows.
+
+        Gated DeltaNet does not have this path. Remote tokens stay out of this
+        module's batch; a helper rank only sees them inside the exchange.
+        """
+
+        ctx = get_forward_context()
+        step = ctx.head_tp_step
+        batch = ctx.head_tp_batch
+        if step is None or batch is None:
+            raise RuntimeError("active head collaboration is missing its batch view")
+        return run_mixed_head_attention(
+            q,
+            k,
+            v,
+            num_heads=self.num_heads,
+            num_kv_heads=self.num_kv_heads,
+            head_dim=self.head_dim,
+            scale=self.scaling,
+            step=step,
+            batch=batch,
+            local_attn=self.attn,
+            cache=self.attn.kv_cache,
+            local_metadata=ctx.head_tp_local_attn_metadata,
+            local_slot_mapping=ctx.head_tp_local_slot_mapping,
+        )
 
 
 class Qwen3NextDecoderLayer(nn.Module):
