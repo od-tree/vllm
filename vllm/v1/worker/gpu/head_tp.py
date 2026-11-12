@@ -62,16 +62,26 @@ def prepare_head_tp_forward(
     group_index, group = found
     spec = next(iter_layer_specs(group.kv_cache_spec))
     block_size = group.kernel_block_size or spec.block_size
+    num_reqs = input_batch.num_reqs
+    seq_lens_cpu = [
+        int(value)
+        for value in input_batch.seq_lens_cpu_upper_bound[:num_reqs].tolist()
+    ]
+    slot_mapping = slot_mappings_by_layer[group.layer_names[0]]
+    num_sms = torch.cuda.get_device_properties(slot_mapping.device).multi_processor_count
     return prepare_head_tp_batch(
         step,
         input_batch,
         rank=rank,
         dp_size=dp_size,
-        slot_mapping=slot_mappings_by_layer[group.layer_names[0]],
+        slot_mapping=slot_mapping,
         block_table=block_tables[group_index],
         block_size=block_size,
         attn_metadata=attn_metadata,
         slot_mapping_by_layer=slot_mappings_by_layer,
+        seq_lens_cpu=seq_lens_cpu,
+        num_kv_heads=spec.num_kv_heads,
+        num_sms=num_sms,
     )
 
 

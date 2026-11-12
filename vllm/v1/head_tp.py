@@ -97,6 +97,11 @@ class HeadTPBatch:
     seq_lens: torch.Tensor
     block_size: int
     partial_caches: dict[str, HeadTPPartialCache] = field(default_factory=dict)
+    # Compute-CTA list for this step, reused by every full-attention layer.
+    # Empty when the kernel should keep its own split heuristic.
+    tiles: torch.Tensor | None = None
+    row_splits: torch.Tensor | None = None
+    max_splits: int = 1
 
 
 @dataclass
@@ -200,6 +205,79 @@ def make_plan(
         visible_len=visible_len,
         predicted_remaining=predicted_remaining,
     )
+
+
+HEAD_TP_SPLIT_CAP = 16
+
+
+def pack_head_tp_tile(row: int, head: int, split: int) -> int:
+    """One compute CTA. Bits 0-15 are the row, 16-23 the KV head, 24-31 the split."""
+
+    if not (0 <= row <= 0xFFFF and 0 <= head <= 0xFF and 0 <= split <= 0xFF):
+        raise ValueError(f"tile ({row}, {head}, {split}) does not fit in one int32")
+    return row | (head << 16) | (split << 24)
+
+
+def _active_shard(step: HeadTPStep | None, req_id: str, rank: int) -> HeadTPShard | None:
+    if step is None:
+        return None
+    plan = step.plans.get(req_id)
+    if plan is None or plan.state != "active":
+        return None
+    for shard in plan.shards:
+        if shard.rank == rank:
+            return shard
+    raise ValueError(f"{req_id} is an active head-TP request but rank {rank} has no shard")
+
+
+def build_head_tp_tile_plan(
+    seq_lens: list[int],
+    req_ids: list[str],
+    step: HeadTPStep | None,
+    rank: int,
+    num_kv_heads: int,
+    num_sms: int,
+    split_cap: int = HEAD_TP_SPLIT_CAP,
+) -> tuple[list[int], list[int], int]:
+    """CTA list for one decode step. Long rows are first and split by length.
+
+    Short rows and inactive plans get one CTA per KV head. Long rows share
+    about ``num_sms`` CTAs when that is more than one CTA per long head, and
+    each row is capped at ``split_cap``. The result is host data; the caller
+    uploads it once and every layer of this step reads the same copy.
+    """
+
+    if len(seq_lens) != len(req_ids):
+        raise ValueError(
+            f"seq_lens ({len(seq_lens)}) and req_ids ({len(req_ids)}) differ"
+        )
+    if num_kv_heads <= 0 or num_sms <= 0 or not req_ids:
+        return [], [], 1
+    long_rows: list[tuple[int, HeadTPShard]] = []
+    short_rows: list[int] = []
+    for index, req_id in enumerate(req_ids):
+        shard = _active_shard(step, req_id, rank)
+        if shard is None:
+            short_rows.append(index)
+        else:
+            long_rows.append((index, shard))
+    long_heads = sum(shard.kv_range[1] - shard.kv_range[0] for _, shard in long_rows)
+    row_splits = [1] * len(req_ids)
+    if long_rows and long_heads < num_sms:
+        total = sum(max(seq_lens[index], 1) for index, _ in long_rows)
+        for index, shard in long_rows:
+            heads = shard.kv_range[1] - shard.kv_range[0]
+            raw = (num_sms * max(seq_lens[index], 1)) // (total * heads)
+            row_splits[index] = min(split_cap, max(1, raw))
+    tiles: list[int] = []
+    for index, shard in long_rows:
+        for split in range(row_splits[index]):
+            for head in range(shard.kv_range[0], shard.kv_range[1]):
+                tiles.append(pack_head_tp_tile(index, head, split))
+    for index in short_rows:
+        for head in range(num_kv_heads):
+            tiles.append(pack_head_tp_tile(index, head, 0))
+    return tiles, row_splits, max(row_splits)
 
 
 def exchange_schedule(
@@ -430,6 +508,9 @@ def prepare_head_tp_batch(
     attn_metadata: Any = None,
     slot_mapping_by_layer: dict[str, torch.Tensor] | None = None,
     partial_caches: dict[str, HeadTPPartialCache] | None = None,
+    seq_lens_cpu: list[int] | None = None,
+    num_kv_heads: int = 0,
+    num_sms: int = 0,
 ) -> HeadTPForwardState:
     """Build the forward-context payload for an active head-collaboration step."""
 
@@ -459,6 +540,18 @@ def prepare_head_tp_batch(
         local_slots = slice_slot_mappings(
             slot_mapping_by_layer, local_rows, num_tokens
         )
+    tile_list, split_list, max_splits = build_head_tp_tile_plan(
+        seq_lens_cpu if seq_lens_cpu is not None else [0] * len(req_ids),
+        req_ids,
+        step,
+        rank,
+        num_kv_heads,
+        num_sms,
+    )
+    tiles = row_split_tensor = None
+    if tile_list:
+        tiles = torch.tensor(tile_list, dtype=torch.int32, device=device)
+        row_split_tensor = torch.tensor(split_list, dtype=torch.int8, device=device)
     batch = HeadTPBatch(
         rank=rank,
         dp_size=dp_size,
@@ -475,6 +568,9 @@ def prepare_head_tp_batch(
             if partial_caches is None
             else dict(partial_caches)
         ),
+        tiles=tiles,
+        row_splits=row_split_tensor,
+        max_splits=max_splits,
     )
     return HeadTPForwardState(
         force_eager=True,
