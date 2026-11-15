@@ -71,13 +71,17 @@ class SegmentBatch:
     The master holds every row. The partner holds long-row suffixes only.
     """
 
-    def __init__(self, q, k, v, table, seqused, which: str):
+    def __init__(self, q, k, v, table, seqused, which: str, lengths=None, n_long: int = 0):
         self.q = q
         self.k = k
         self.v = v
         self.table = table
         self.seqused = seqused
         self.which = which  # "full" | "master" | "partner"
+        # CPU lengths of the KV this rank holds, in row order. ``n_long`` is
+        # how many of those rows are the long piece and may be tiled.
+        self.lengths = list(lengths or [])
+        self.n_long = n_long
 
 
 def relocate_kv(segment: SegmentBatch, device) -> SegmentBatch:
@@ -99,6 +103,8 @@ def relocate_kv(segment: SegmentBatch, device) -> SegmentBatch:
         segment.table.to(target),
         segment.seqused.to(target),
         segment.which,
+        segment.lengths,
+        segment.n_long,
     )
 
 
@@ -134,7 +140,7 @@ def _pack_rows(q, k, v, table, seqs, n_long, which: str, device) -> SegmentBatch
         empty_k = k.new_zeros(0, BLOCK, KV, DIM)
         empty_table = torch.zeros(0, 1, dtype=torch.int32, device=device)
         empty_used = torch.zeros(0, dtype=torch.int32, device=device)
-        return SegmentBatch(empty_q, empty_k, empty_k, empty_table, empty_used, which)
+        return SegmentBatch(empty_q, empty_k, empty_k, empty_table, empty_used, which, [], 0)
     nonempty_k = [pages for pages in pages_k if pages.shape[0] > 0]
     nonempty_v = [pages for pages in pages_v if pages.shape[0] > 0]
     if nonempty_k:
@@ -166,6 +172,8 @@ def _pack_rows(q, k, v, table, seqs, n_long, which: str, device) -> SegmentBatch
         seg_table,
         torch.tensor(lengths, dtype=torch.int32, device=device),
         which,
+        lengths,
+        n_long if which == "master" else len(lengths),
     )
 
 
@@ -176,7 +184,7 @@ def build_segments(seqs: list[int], n_long: int, device, seed: int = 11):
     (rank 1) owns only the long-row suffix, so short rows stay out of the route.
     """
     q, k, v, table, seqused = make_full_cache(seqs, device, seed)
-    full = SegmentBatch(q, k, v, table, seqused, "full")
+    full = SegmentBatch(q, k, v, table, seqused, "full", list(seqs), 0)
     master = _pack_rows(q, k, v, table, seqs, n_long, "master", device)
     partner = _pack_rows(q, k, v, table, seqs, n_long, "partner", device)
     mask = torch.zeros(2, len(seqs), dtype=torch.int32)

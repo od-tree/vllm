@@ -7,7 +7,7 @@ through the already installed `varlen_fwd`, with head-TP arguments left off
 | File | Role |
 | --- | --- |
 | `layout_cp.py` | Page-aligned split. Master batch holds short rows at full length; partner gets long suffixes only |
-| `attn_local.py` | FA2 paged decode. `num_splits=0` uses the occupancy heuristic. LSE is `[16, B]` |
+| `attn_local.py` | FA2 paged decode. `num_splits=0` uses the occupancy heuristic unless a CP tile plan is passed. LSE is `[16, B]` |
 | `merge_cp.py` | Online combine from `[W, B, H, *]`. A rank with `context_lens <= 0` is skipped. Writes O only |
 | `copy_idx.py` | Indexed copies that stage partial O and LSE before the return all-to-all |
 | `hao_basic.py` | DLSlime Basic all-to-all: one kernel, int4 warp copy, flag handshake inside it |
@@ -18,7 +18,7 @@ through the already installed `varlen_fwd`, with head-TP arguments left off
 | `test_merge_unit.py` | Merge formula, no FA2 |
 | `test_merge_fa2_halves.py` | One GPU, two segments vs full FA2 |
 | `test_e2e_correctness.py` | Two GPUs. Master attention includes short rows |
-| `bench_perf.py` | Q copy + both FA2 + O/LSE copy + merge. `--full` adds the long head-TP shapes |
+| `bench_perf.py` | Q copy + both FA2 + O/LSE copy + merge. Default cases are the head-TP perf shapes. `--quick` is the small smoke set |
 
 Run from this directory:
 

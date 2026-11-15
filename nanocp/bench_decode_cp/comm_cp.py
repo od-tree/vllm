@@ -181,6 +181,21 @@ class CpComm:
             ]
             for name, shape in self.shapes.items()
         }
+        self._prepare_tables()
+
+    def _prepare_tables(self) -> None:
+        """Pointer tables have to exist before a rank spins on the peer flag.
+
+        Building one during the next channel's launch synchronizes this GPU
+        and waits for a handshake the other rank has not entered.
+        """
+        if not any(device.type == "cuda" for device in self.devices):
+            return
+        from hao_basic import prepare_tables
+
+        for name in self.shapes:
+            for device in self.devices:
+                prepare_tables(self.buffers[name], self.arrived[name], self._gpu_tables, device)
 
     def launch_q(self, src: int, q: torch.Tensor, mask: torch.Tensor | None = None,
                  dst_row_indices: torch.Tensor | None = None, sync: bool = True) -> RouteLaunch:

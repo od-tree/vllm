@@ -26,6 +26,26 @@ import torch
 
 _EXT = None
 
+# The pybind file is compiled separately from the .cu, so it needs a declaration.
+_CPP = r"""
+#include <torch/extension.h>
+void hao_basic_launch(torch::Tensor x,
+                      torch::Tensor buffer_ptrs,
+                      torch::Tensor signal_ptrs,
+                      torch::Tensor semaphore,
+                      int64_t rank,
+                      int64_t world,
+                      int64_t batch_size,
+                      int64_t max_batch,
+                      int64_t hidden,
+                      int64_t is_transpose,
+                      int64_t handshake,
+                      torch::Tensor mask,
+                      torch::Tensor dst_rows,
+                      int64_t has_mask,
+                      int64_t has_dst_rows);
+"""
+
 _SRC = r"""
 #include <torch/extension.h>
 #include <ATen/cuda/CUDAContext.h>
@@ -254,7 +274,7 @@ def _ext():
 
         _EXT = load_inline(
             name="hao_basic_intranode",
-            cpp_sources=[],
+            cpp_sources=[_CPP],
             cuda_sources=[_SRC],
             functions=["hao_basic_launch"],
             extra_cuda_cflags=["-O3"],
@@ -277,14 +297,49 @@ def _resident(cache: dict, tensor: torch.Tensor, device: torch.device) -> torch.
     return uploaded
 
 
+def _empty_i32(cache: dict, device: torch.device) -> torch.Tensor:
+    key = ("empty", device.type, device.index)
+    hit = cache.get(key)
+    if hit is not None:
+        return hit
+    hit = torch.empty(0, dtype=torch.int32, device=device)
+    cache[key] = hit
+    return hit
+
+
 def _ptrs(cache: dict, tensors: list[torch.Tensor], device: torch.device) -> torch.Tensor:
+    """Device pointer table. Built once, with a stream-ordered copy.
+
+    ``torch.tensor(..., device=cuda)`` copies through a synchronizing
+    memcpy. The next channel's table would then wait for the kernel that
+    is already spinning on the peer flag, and that peer has not launched.
+    """
     key = ("ptrs", tuple(int(t.data_ptr()) for t in tensors), device.index)
     hit = cache.get(key)
     if hit is not None:
         return hit
-    table = torch.tensor([t.data_ptr() for t in tensors], dtype=torch.int64, device=device)
+    host = torch.tensor([t.data_ptr() for t in tensors], dtype=torch.int64)
+    if device.type == "cuda":
+        host = host.pin_memory()
+        table = torch.empty(host.shape, dtype=torch.int64, device=device)
+        table.copy_(host, non_blocking=True)
+    else:
+        table = host
     cache[key] = table
+    cache[("ptrhost", key)] = host
     return table
+
+
+def prepare_tables(buffers: list[torch.Tensor], flags: list[torch.Tensor],
+                   cache: dict, device: torch.device) -> None:
+    """Upload pointer tables before any rank enters the handshake."""
+    if device.type != "cuda":
+        return
+    torch.cuda.set_device(device)
+    _ptrs(cache, buffers, device)
+    _ptrs(cache, flags, device)
+    _empty_i32(cache, device)
+    torch.cuda.current_stream(device).synchronize()
 
 
 def hao_launch(
@@ -322,7 +377,13 @@ def hao_launch(
         raise ValueError(
             f"dst_row_indices {tuple(dst_row_indices.shape)} != {(world, max_batch)}"
         )
-    flat = src.reshape(src.shape[0], -1)
+    if src.shape[0] == 0:
+        hidden = 1
+        for extent in src.shape[1:]:
+            hidden *= extent
+        flat = src.reshape(0, hidden)
+    else:
+        flat = src.reshape(src.shape[0], -1)
     if not flat.is_contiguous():
         flat = flat.contiguous()
     if batch_size == 0:
@@ -340,7 +401,7 @@ def hao_launch(
         raise ValueError(f"hao_basic row is {row_bytes} bytes; need a multiple of 16")
     device = flat.device
     torch.cuda.set_device(device)
-    empty = torch.empty(0, dtype=torch.int32, device=device)
+    empty = _empty_i32(cache, device)
     mask_gpu = _resident(cache, mask, device) if mask is not None else empty
     rows_gpu = _resident(cache, dst_row_indices, device) if dst_row_indices is not None else empty
     dst_ptrs = _ptrs(cache, dst_buffers, device)

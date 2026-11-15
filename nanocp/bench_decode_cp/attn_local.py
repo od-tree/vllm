@@ -1,8 +1,9 @@
 """Paged GQA decode through the already-built FA2 extension.
 
-Head-TP arguments stay unset (``src_rank=-1``, no tile plan). This file does
-not modify the head-TP operator; it only calls ``varlen_fwd``. The returned
-LSE is the segment's already-combined LSE, normalized to ``[16, B]``.
+Head exchange stays off (``src_rank=-1``). A CP tile plan may still be
+passed: it is the same CTA list head-TP uses, with both KV heads local.
+This file does not modify the head-TP operator. The returned LSE is the
+segment's already-combined LSE, normalized to ``[16, B]``.
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ def empty_partial(q: torch.Tensor):
     return out, lse
 
 
-def attn_local(q, k, v, block_table, seqused, num_splits: int = 0, max_seqlen_k: int | None = None):
+def attn_local(q, k, v, block_table, seqused, num_splits: int = 0,
+               max_seqlen_k: int | None = None, tile_plan=None):
     """Run one decode step.
 
     ``q`` is ``[B, 16, 256]`` bf16. Returns ``(out, lse)`` with ``out`` the
@@ -53,12 +55,16 @@ def attn_local(q, k, v, block_table, seqused, num_splits: int = 0, max_seqlen_k:
     cu_q = torch.arange(batch + 1, dtype=torch.int32, device=device)
     cu_k = torch.zeros(batch + 1, dtype=torch.int32, device=device)
     out = torch.empty_like(q)
-    # Same positional signature as the head-TP test, with head-TP left off.
+    if tile_plan is None:
+        tiles, row_splits, max_splits = None, None, 0
+    else:
+        tiles, row_splits, max_splits = tile_plan
+    # Head exchange stays off. The last three arguments are the optional CTA list.
     ret = _ops().varlen_fwd(
         q, k, v, out, cu_q, cu_k, seqused, None, block_table, None,
         1, int(max_seqlen_k), 0.0, SCALE, True, False, -1, -1, 0.0, False,
         int(num_splits), None,
-        None, 0, 0, -1, *([None] * 16), 0, 0, 0, None, None, 0,
+        None, 0, 0, -1, *([None] * 16), 0, 0, 0, tiles, row_splits, int(max_splits),
     )
     if not isinstance(ret, (tuple, list)) or len(ret) < 2 or ret[1] is None:
         raise RuntimeError(f"varlen_fwd did not return an LSE (got {type(ret)})")

@@ -14,6 +14,7 @@ from attn_local import attn_local
 from comm_cp import CpComm, as_device
 from layout_cp import SegmentBatch
 from merge_cp import combine_kv
+from tile_cp import segment_tiles
 
 
 def merge_halves(prefix, suffix, num_splits: int = 0,
@@ -23,13 +24,15 @@ def merge_halves(prefix, suffix, num_splits: int = 0,
         raise ValueError(
             f"prefix batch {prefix.q.shape[0]} != suffix batch {suffix.q.shape[0]}"
         )
+    plan0 = segment_tiles(prefix) if num_splits < 1 else None
+    plan1 = segment_tiles(suffix) if num_splits < 1 else None
     o0, l0 = attn_local(
         prefix.q, prefix.k, prefix.v, prefix.table, prefix.seqused,
-        num_splits=num_splits, max_seqlen_k=max_k_prefix,
+        num_splits=num_splits, max_seqlen_k=max_k_prefix, tile_plan=plan0,
     )
     o1, l1 = attn_local(
         suffix.q, suffix.k, suffix.v, suffix.table, suffix.seqused,
-        num_splits=num_splits, max_seqlen_k=max_k_suffix,
+        num_splits=num_splits, max_seqlen_k=max_k_suffix, tile_plan=plan1,
     )
     if o0.is_cuda:
         torch.cuda.set_device(o0.device)
@@ -41,14 +44,13 @@ def merge_halves(prefix, suffix, num_splits: int = 0,
     return merged
 
 
-def _return_partials(comm, rank: int, slots: torch.Tensor, out: torch.Tensor,
-                     lse: torch.Tensor, moe_rank: int) -> list:
-    """Stage O and LSE the way NanoCP does, then transpose all-to-all.
+def _stage_return(comm, rank: int, slots: torch.Tensor, out: torch.Tensor,
+                  lse: torch.Tensor, moe_rank: int):
+    """Indexed copies into the local buffer and a fresh input buffer.
 
-    Two indexed copies per tensor: one into the persistent local buffer at
-    ``[src, slot]``, one into a freshly allocated input buffer at
-    ``[moe, slot]``. The all-to-all reads that input and lands at
-    ``buffer[src, row]`` on the destination.
+    Does not launch. Every rank has to enter the O kernel before any rank
+    launches LSE: the LSE launch touches this GPU, and that waits out an O
+    kernel which is still spinning until the partner's O kernel is queued.
     """
     from copy_idx import copy_batch_indexed_triton
 
@@ -142,19 +144,28 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
         max_k = None if max_ks is None else max_ks[rank]
         out, lse = attn_local(
             q_rank, k, v, table, used, num_splits=num_splits, max_seqlen_k=max_k,
+            tile_plan=segment_tiles(segments[rank]) if num_splits < 1 else None,
         )
         produced.append((rank, slots, out, lse))
-    partial_launches = []
+    staged = []
     produced_ranks = set()
     for rank, slots, out, lse in produced:
         produced_ranks.add(rank)
         lse_rows = lse.transpose(0, 1).contiguous().unsqueeze(-1)
-        partial_launches.extend(_return_partials(comm, rank, slots, out, lse_rows, moe_rank))
-    # A rank with no partial still has to enter the return kernel on 2+ GPUs.
-    # Doing that inside each launch would handshake before the real send.
+        staged.append((rank, _stage_return(comm, rank, slots, out, lse_rows, moe_rank)))
+    # O from every rank, then LSE. One process cannot enter the next channel
+    # while this GPU's O kernel is still waiting for a partner that has not
+    # launched. A rank with no partial still has to enter the kernel.
+    partial_launches = []
+    for rank, (o_in, lse_in, mask) in staged:
+        partial_launches.append(comm.launch_return("o", rank, o_in, mask, sync=False))
     for rank in range(world):
         if rank not in produced_ranks:
             comm.participate("o", rank)
+    for rank, (o_in, lse_in, mask) in staged:
+        partial_launches.append(comm.launch_return("lse", rank, lse_in, mask, sync=False))
+    for rank in range(world):
+        if rank not in produced_ranks:
             comm.participate("lse", rank)
     for launch in partial_launches:
         comm.wait(launch, moe_rank)
