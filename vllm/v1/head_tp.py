@@ -210,6 +210,16 @@ def make_plan(
 HEAD_TP_SPLIT_CAP = 16
 
 
+def flash_attn_split_kv_block_tokens(head_size: int) -> int:
+    """FA2 split-KV tile width. Must match ``set_params_splitkv`` in flash_api.cpp."""
+
+    if head_size <= 64:
+        return 256
+    if head_size <= 128:
+        return 128
+    return 64
+
+
 def pack_head_tp_tile(row: int, head: int, split: int) -> int:
     """One compute CTA. Bits 0-15 are the row, 16-23 the KV head, 24-31 the split."""
 
@@ -238,13 +248,16 @@ def build_head_tp_tile_plan(
     num_kv_heads: int,
     num_sms: int,
     split_cap: int = HEAD_TP_SPLIT_CAP,
+    kv_block_tokens: int = 64,
 ) -> tuple[list[int], list[int], int]:
     """CTA list for one decode step. Long rows are first and split by length.
 
     Short rows and inactive plans get one CTA per KV head. Long rows share
-    about ``num_sms`` CTAs when that is more than one CTA per long head, and
-    each row is capped at ``split_cap``. The result is host data; the caller
-    uploads it once and every layer of this step reads the same copy.
+    about ``num_sms`` CTAs when that is more than one CTA per long head.
+    Each row is capped at ``split_cap`` and at the number of FA2 KV tiles
+    (``ceil(seq / kv_block_tokens)``), so a short long-row does not launch
+    empty splits. The result is host data; the caller uploads it once and
+    every layer of this step reads the same copy.
     """
 
     if len(seq_lens) != len(req_ids):
@@ -253,6 +266,8 @@ def build_head_tp_tile_plan(
         )
     if num_kv_heads <= 0 or num_sms <= 0 or not req_ids:
         return [], [], 1
+    if kv_block_tokens <= 0:
+        raise ValueError(f"kv_block_tokens must be positive, got {kv_block_tokens}")
     long_rows: list[tuple[int, HeadTPShard]] = []
     short_rows: list[int] = []
     for index, req_id in enumerate(req_ids):
@@ -267,8 +282,10 @@ def build_head_tp_tile_plan(
         total = sum(max(seq_lens[index], 1) for index, _ in long_rows)
         for index, shard in long_rows:
             heads = shard.kv_range[1] - shard.kv_range[0]
-            raw = (num_sms * max(seq_lens[index], 1)) // (total * heads)
-            row_splits[index] = min(split_cap, max(1, raw))
+            seq = max(seq_lens[index], 1)
+            raw = (num_sms * seq) // (total * heads)
+            n_blocks = max(1, (seq + kv_block_tokens - 1) // kv_block_tokens)
+            row_splits[index] = min(split_cap, n_blocks, max(1, raw))
     tiles: list[int] = []
     for index, shard in long_rows:
         for split in range(row_splits[index]):
@@ -511,6 +528,7 @@ def prepare_head_tp_batch(
     seq_lens_cpu: list[int] | None = None,
     num_kv_heads: int = 0,
     num_sms: int = 0,
+    kv_block_tokens: int = 64,
 ) -> HeadTPForwardState:
     """Build the forward-context payload for an active head-collaboration step."""
 
@@ -547,6 +565,7 @@ def prepare_head_tp_batch(
         rank,
         num_kv_heads,
         num_sms,
+        kv_block_tokens=kv_block_tokens,
     )
     tiles = row_split_tensor = None
     if tile_list:

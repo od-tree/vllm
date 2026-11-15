@@ -82,3 +82,40 @@ def test_saturated_long_batch_stays_at_one_split():
     assert max_splits == 1
     assert len(tiles) == 256
     assert {_unpack(tile)[1] for tile in tiles} == {0}
+
+
+def test_splits_stop_at_kv_blocks():
+    # Formula alone would give 16 for every long row. With kBlockN=64,
+    # 64 / 96 / 128 tokens only have 1 / 2 / 2 real KV tiles.
+    step = HeadTPStep(
+        plans={
+            "a": make_plan(
+                "a", 16, 2, 2, 0, 2,
+                state="active", kv_source="gpu_copy",
+                visible_len=64, predicted_remaining=0,
+            ),
+            "b": make_plan(
+                "b", 16, 2, 2, 0, 2,
+                state="active", kv_source="gpu_copy",
+                visible_len=96, predicted_remaining=0,
+            ),
+            "c": make_plan(
+                "c", 16, 2, 2, 0, 2,
+                state="active", kv_source="gpu_copy",
+                visible_len=128, predicted_remaining=0,
+            ),
+        },
+        active=True,
+    )
+    tiles, splits, max_splits = build_head_tp_tile_plan(
+        [64, 96, 128, 17], ["a", "b", "c", "short"], step, rank=0,
+        num_kv_heads=2, num_sms=108, kv_block_tokens=64,
+    )
+    assert splits == [1, 2, 2, 1]
+    assert max_splits == 2
+    assert [_unpack(tile) for tile in tiles] == [
+        (0, 0, 0),
+        (1, 0, 0), (1, 0, 1),
+        (2, 0, 0), (2, 0, 1),
+        (3, 0, 0), (3, 1, 0),
+    ]

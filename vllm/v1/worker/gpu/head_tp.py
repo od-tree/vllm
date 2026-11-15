@@ -15,6 +15,7 @@ from vllm.v1.head_tp import (
     HeadTPForwardState,
     HeadTPLoadTracker,
     HeadTPStep,
+    flash_attn_split_kv_block_tokens,
     head_tp_is_active,
     prepare_head_tp_batch,
 )
@@ -82,6 +83,7 @@ def prepare_head_tp_forward(
         seq_lens_cpu=seq_lens_cpu,
         num_kv_heads=spec.num_kv_heads,
         num_sms=num_sms,
+        kv_block_tokens=flash_attn_split_kv_block_tokens(spec.head_size),
     )
 
 
