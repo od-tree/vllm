@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="500" viewBox="0 0 760 500">
+  <rect width="760" height="500" fill="#ffffff"/>
+  <text x="28" y="36" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="600" fill="#1c2430">请求级按头张量并行（TP）</text>
+  <text x="28" y="60" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="13" fill="#5c6775">长请求的 KV 按头切开。每张卡持有一部分头、全部上下文。结果按头拼接，不做 LSE。</text>
+
+  <g font-family="PingFang SC, Noto Sans CJK SC, sans-serif">
+    <rect x="36" y="88" width="300" height="280" rx="10" fill="#f4f7fb" stroke="#d5deea"/>
+    <rect x="424" y="88" width="300" height="280" rx="10" fill="#f4f7fb" stroke="#d5deea"/>
+
+    <text x="186" y="116" text-anchor="middle" font-size="15" font-weight="600" fill="#1c2430">GPU 0 · 请求所在卡</text>
+    <text x="574" y="116" text-anchor="middle" font-size="15" font-weight="600" fill="#1c2430">GPU 1 · 头伙伴</text>
+
+    <rect x="56" y="140" width="260" height="40" rx="6" fill="#d9e8fb"/>
+    <text x="186" y="165" text-anchor="middle" font-size="14" fill="#1c2430">短请求 · 全部 KV 头</text>
+    <rect x="444" y="140" width="260" height="40" rx="6" fill="#d9e8fb"/>
+    <text x="574" y="165" text-anchor="middle" font-size="14" fill="#1c2430">短请求 · 留在本卡</text>
+
+    <rect x="56" y="204" width="260" height="88" rx="6" fill="#f6d7b8"/>
+    <text x="186" y="232" text-anchor="middle" font-size="14" font-weight="600" fill="#1c2430">KV 头 0 · 全上下文</text>
+    <text x="186" y="254" text-anchor="middle" font-size="13" fill="#5c4030">token 0 … L</text>
+    <text x="186" y="274" text-anchor="middle" font-size="13" fill="#5c4030">只算 Q[0:8]</text>
+
+    <rect x="444" y="204" width="260" height="88" rx="6" fill="#f6d7b8"/>
+    <text x="574" y="232" text-anchor="middle" font-size="14" font-weight="600" fill="#1c2430">KV 头 1 · 全上下文</text>
+    <text x="574" y="254" text-anchor="middle" font-size="13" fill="#5c4030">token 0 … L</text>
+    <text x="574" y="274" text-anchor="middle" font-size="13" fill="#5c4030">只算 Q[8:16]</text>
+
+    <rect x="56" y="312" width="260" height="36" rx="6" fill="#e7f6ea" stroke="#b7dec0"/>
+    <text x="186" y="335" text-anchor="middle" font-size="14" fill="#1c2430">按头拼接后进入 MoE</text>
+  </g>
+
+  <defs>
+    <marker id="arrowTp" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#c05621"/>
+    </marker>
+    <marker id="arrowTpBack" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#2b6cb0"/>
+    </marker>
+  </defs>
+  <path d="M316 222 H424" stroke="#c05621" stroke-width="2" fill="none" marker-end="url(#arrowTp)"/>
+  <text x="370" y="214" text-anchor="middle" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="12" fill="#c05621">Q[8:16]</text>
+  <path d="M424 276 H316" stroke="#2b6cb0" stroke-width="2" fill="none" marker-end="url(#arrowTpBack)"/>
+  <text x="370" y="294" text-anchor="middle" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="12" fill="#2b6cb0">头输出</text>
+
+  <text x="36" y="412" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="13" fill="#1c2430">每个 Q 头只和自己的 KV 头计算，头之间在 O 投影之前互不相加。</text>
+  <text x="36" y="438" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#1c2430">output = concat(Q[0:8], Q[8:16])</text>
+</svg>

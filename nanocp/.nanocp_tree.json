@@ -1,0 +1,3727 @@
+{
+  "sha": "8abce29fe3ba0af3cd785b5e533b5b4b22ae70d5",
+  "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/8abce29fe3ba0af3cd785b5e533b5b4b22ae70d5",
+  "tree": [
+    {
+      "path": ".clang-format",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5b2f52989477c7a18bec47d0db03bab128e72dd2",
+      "size": 1968,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5b2f52989477c7a18bec47d0db03bab128e72dd2"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "37df54424dfc79f6024c9dc04d4a4f400afcb82d",
+      "size": 4655,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/37df54424dfc79f6024c9dc04d4a4f400afcb82d"
+    },
+    {
+      "path": ".pre-commit-config.yaml",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "edbfde698045507fb9d386bfbfbdca9414b46e5d",
+      "size": 1439,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/edbfde698045507fb9d386bfbfbdca9414b46e5d"
+    },
+    {
+      "path": "AGENTS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3be1919e2776113db258f911a8ac275514d1fff6",
+      "size": 6909,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3be1919e2776113db258f911a8ac275514d1fff6"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eed25401e0aea1ead1b4843bd83d00307411a1b9",
+      "size": 555,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/eed25401e0aea1ead1b4843bd83d00307411a1b9"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4cc08134695bba23785c9868f7a380bb626affb2",
+      "size": 1088,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4cc08134695bba23785c9868f7a380bb626affb2"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "55e892ea6fd2db185d0dc132de798fe7dba45b9a",
+      "size": 1551,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/55e892ea6fd2db185d0dc132de798fe7dba45b9a"
+    },
+    {
+      "path": "ae_scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "de8c3bb83c55bc28ae593bea02ab4595be9e0373",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/de8c3bb83c55bc28ae593bea02ab4595be9e0373"
+    },
+    {
+      "path": "ae_scripts/.gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7045e8adc184c44b76a5c998ab880c2d193f725b",
+      "size": 1088,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7045e8adc184c44b76a5c998ab880c2d193f725b"
+    },
+    {
+      "path": "ae_scripts/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8670c6b33424a0c73d901e2595f0c2f0ac21a339",
+      "size": 16747,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8670c6b33424a0c73d901e2595f0c2f0ac21a339"
+    },
+    {
+      "path": "ae_scripts/ae_utils",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "73a54951d80bdd667e54d7323b293b37d7ee99d5",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/73a54951d80bdd667e54d7323b293b37d7ee99d5"
+    },
+    {
+      "path": "ae_scripts/ae_utils/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bcb59d0484bbebcca1bada902feac7d7c493d95a",
+      "size": 65,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bcb59d0484bbebcca1bada902feac7d7c493d95a"
+    },
+    {
+      "path": "ae_scripts/ae_utils/paths.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e6aa7d8aa6c5b0c5985a3277d750751fc8567b0",
+      "size": 2282,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8e6aa7d8aa6c5b0c5985a3277d750751fc8567b0"
+    },
+    {
+      "path": "ae_scripts/ae_utils/plotting.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ab2348841b17b240bea067da9b8514a386ef8d1",
+      "size": 790,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0ab2348841b17b240bea067da9b8514a386ef8d1"
+    },
+    {
+      "path": "ae_scripts/algorithm",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ceb650cf21ae204b1641de9ce67d8e9d4b7ce51a",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/ceb650cf21ae204b1641de9ce67d8e9d4b7ce51a"
+    },
+    {
+      "path": "ae_scripts/algorithm/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a5dc71caa13a98b533d350eeaf753576dfc0ca7",
+      "size": 5675,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1a5dc71caa13a98b533d350eeaf753576dfc0ca7"
+    },
+    {
+      "path": "ae_scripts/algorithm/deepseek_v3_h200_pipeline_p50.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f33d6811e299508a491d2def6cd2e16a2aad8c3a",
+      "size": 63077,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f33d6811e299508a491d2def6cd2e16a2aad8c3a"
+    },
+    {
+      "path": "ae_scripts/algorithm/measure_sp_pipeline.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "b528fbdb68e5d1c6072f4801088aa6eaad435128",
+      "size": 21401,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b528fbdb68e5d1c6072f4801088aa6eaad435128"
+    },
+    {
+      "path": "ae_scripts/algorithm/measure_sp_pipeline_kimi.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "36d686d2a784d50920028d1281377797034fef1b",
+      "size": 16508,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/36d686d2a784d50920028d1281377797034fef1b"
+    },
+    {
+      "path": "ae_scripts/algorithm/reproduced_policy.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ccc3e79767f8cb475affec40c249577756302eba",
+      "size": 989,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ccc3e79767f8cb475affec40c249577756302eba"
+    },
+    {
+      "path": "ae_scripts/algorithm/search_sp_buckets.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "13da2ca0f40b3bb62b8925bc3d39aa3efed29c7f",
+      "size": 7810,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/13da2ca0f40b3bb62b8925bc3d39aa3efed29c7f"
+    },
+    {
+      "path": "ae_scripts/algorithm/test_sp_attention_cudagraph.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c85f997c126d440b6dd89b321ad7c09402962075",
+      "size": 62735,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c85f997c126d440b6dd89b321ad7c09402962075"
+    },
+    {
+      "path": "ae_scripts/assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8580a941b86c34a9256e7c1b1398e12f477a17e6",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/8580a941b86c34a9256e7c1b1398e12f477a17e6"
+    },
+    {
+      "path": "ae_scripts/assets/fonts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c8b594425f2f4d28b86e8b118fd1b0aa05800516",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/c8b594425f2f4d28b86e8b118fd1b0aa05800516"
+    },
+    {
+      "path": "ae_scripts/assets/fonts/LinBiolinum_R.otf",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ada5880117835b4f6020f38fd8da1bc1575326c5",
+      "size": 418076,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ada5880117835b4f6020f38fd8da1bc1575326c5"
+    },
+    {
+      "path": "ae_scripts/assets/fonts/LinBiolinum_RB.otf",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8723b81ae7be96b77215d8aad95efc61ec2730ba",
+      "size": 486092,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8723b81ae7be96b77215d8aad95efc61ec2730ba"
+    },
+    {
+      "path": "ae_scripts/assets/fonts/LinBiolinum_RI.otf",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "86d0cf43003eb8443506d2926424d7949fee4787",
+      "size": 662776,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/86d0cf43003eb8443506d2926424d7949fee4787"
+    },
+    {
+      "path": "ae_scripts/assets/fonts/OFL-1.1.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a25337c2bec3622f28977c92ccd3bb0aa23670b7",
+      "size": 4462,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a25337c2bec3622f28977c92ccd3bb0aa23670b7"
+    },
+    {
+      "path": "ae_scripts/basic-test",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9595d5cae0f445ecd7d49d09052d781c9f83d809",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/9595d5cae0f445ecd7d49d09052d781c9f83d809"
+    },
+    {
+      "path": "ae_scripts/basic-test/.gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fbca22537997fac50f623ee6eb31f9bb2bb30799",
+      "size": 9,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/fbca22537997fac50f623ee6eb31f9bb2bb30799"
+    },
+    {
+      "path": "ae_scripts/basic-test/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9fdea081448bc6423484890d12b8cfad03dce4f0",
+      "size": 2991,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9fdea081448bc6423484890d12b8cfad03dce4f0"
+    },
+    {
+      "path": "ae_scripts/basic-test/run_basic_test.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "bd842c291ec26f1de23fae270e4345c18f8ae5cb",
+      "size": 28059,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bd842c291ec26f1de23fae270e4345c18f8ae5cb"
+    },
+    {
+      "path": "ae_scripts/dataset",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "43177756f9efc90e996b9345601c8705c69ea802",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/43177756f9efc90e996b9345601c8705c69ea802"
+    },
+    {
+      "path": "ae_scripts/dataset/Gemini_Issues_Stats_rename-shuffle.csv",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "c904b8a9d09d3d99dd6cdee08f713a3b1d8916d4",
+      "size": 129530,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c904b8a9d09d3d99dd6cdee08f713a3b1d8916d4"
+    },
+    {
+      "path": "ae_scripts/dataset/sharegpt4o-mixed-random-60k.csv",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "489b335b39d14c10f00a5905cfc4f7226966b962",
+      "size": 541335,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/489b335b39d14c10f00a5905cfc4f7226966b962"
+    },
+    {
+      "path": "ae_scripts/dataset/sharegpt4o-random_geminiissue_r0.01_n60000_60k.csv",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "6ce6b4d6450afcde88d9d18abac43d5300fdea60",
+      "size": 1154923,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6ce6b4d6450afcde88d9d18abac43d5300fdea60"
+    },
+    {
+      "path": "ae_scripts/dataset/sharegpt4o-random_geminiissue_r0.05_n60000_60k.csv",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "44de8e9d59a5ab5515bc9aa884e789a63b2f1694",
+      "size": 1166482,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/44de8e9d59a5ab5515bc9aa884e789a63b2f1694"
+    },
+    {
+      "path": "ae_scripts/docker",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "facc8e286ef9cc598d469bb7e8847a3bb7cb0201",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/facc8e286ef9cc598d469bb7e8847a3bb7cb0201"
+    },
+    {
+      "path": "ae_scripts/docker/.dockerignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6ee3b4a0367c0a5069b758df8d1d41eba1ee5224",
+      "size": 104,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6ee3b4a0367c0a5069b758df8d1d41eba1ee5224"
+    },
+    {
+      "path": "ae_scripts/docker/.gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f405ee10f07b4ec94bff130b1cbaff310cff53d7",
+      "size": 24,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f405ee10f07b4ec94bff130b1cbaff310cff53d7"
+    },
+    {
+      "path": "ae_scripts/docker/Dockerfile",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8bfb2e087a6cb07380adb47417b85db59b232827",
+      "size": 5691,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8bfb2e087a6cb07380adb47417b85db59b232827"
+    },
+    {
+      "path": "ae_scripts/docker/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c86d8adaecd333468c114c02fb51dfd35bc97dd",
+      "size": 3426,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5c86d8adaecd333468c114c02fb51dfd35bc97dd"
+    },
+    {
+      "path": "ae_scripts/docker/constraints-base.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "040ed2cf7ba39ffd5af7739ff1db4520e10f99ed",
+      "size": 734,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/040ed2cf7ba39ffd5af7739ff1db4520e10f99ed"
+    },
+    {
+      "path": "ae_scripts/docker/export_vllm_precompiled.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e385f2fb4376936b8d2fb5a2b32ab14425ea162d",
+      "size": 2272,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e385f2fb4376936b8d2fb5a2b32ab14425ea162d"
+    },
+    {
+      "path": "ae_scripts/docker/prepare_context.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dfe669f27c970bd9201600c134d18870e9de8717",
+      "size": 2245,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/dfe669f27c970bd9201600c134d18870e9de8717"
+    },
+    {
+      "path": "ae_scripts/docker/prepare_flashmla.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "31f07e7715f10244c17e2f87ff01a9f708bb1251",
+      "size": 1341,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/31f07e7715f10244c17e2f87ff01a9f708bb1251"
+    },
+    {
+      "path": "ae_scripts/docker/requirements-extra.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "82b5b35682d448386d521111f7b5afb3cf520b26",
+      "size": 448,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/82b5b35682d448386d521111f7b5afb3cf520b26"
+    },
+    {
+      "path": "ae_scripts/docker/test_prepare_context.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "36ab7852639615ad63b1928763b77ebd0f10694e",
+      "size": 2586,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/36ab7852639615ad63b1928763b77ebd0f10694e"
+    },
+    {
+      "path": "ae_scripts/docker/verify_environment.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d22d3126d6872895e874601a1831d9469631b35d",
+      "size": 3608,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d22d3126d6872895e874601a1831d9469631b35d"
+    },
+    {
+      "path": "ae_scripts/fig12",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2e372eff58210dae1c9f853db844db1c1be926dd",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/2e372eff58210dae1c9f853db844db1c1be926dd"
+    },
+    {
+      "path": "ae_scripts/fig12/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2dd19b3049da7efc58e04ba7cff9c77b1c72502a",
+      "size": 2667,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2dd19b3049da7efc58e04ba7cff9c77b1c72502a"
+    },
+    {
+      "path": "ae_scripts/fig12/e2e_config.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c7e657e84646cd0ae01bcfe0f011738170084ba3",
+      "size": 6996,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c7e657e84646cd0ae01bcfe0f011738170084ba3"
+    },
+    {
+      "path": "ae_scripts/fig12/e2e_run_results.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "6209b26a237cda0a0a6b5c325a1c12ede94f50bb",
+      "size": 16226,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6209b26a237cda0a0a6b5c325a1c12ede94f50bb"
+    },
+    {
+      "path": "ae_scripts/fig12/launch_nanodeploy_e2e.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "db74f497b0648b0cfcf8c8d5d6a816d69bbe4124",
+      "size": 31520,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/db74f497b0648b0cfcf8c8d5d6a816d69bbe4124"
+    },
+    {
+      "path": "ae_scripts/fig12/launch_vllm_e2e.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "fb8d305dd970a144993c1ea8f86d69c0f92f04c3",
+      "size": 23825,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/fb8d305dd970a144993c1ea8f86d69c0f92f04c3"
+    },
+    {
+      "path": "ae_scripts/fig12/nanodeploy_run_data.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "d832b225c46b678ec24507a3c196d7fce3e538c7",
+      "size": 6208,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d832b225c46b678ec24507a3c196d7fce3e538c7"
+    },
+    {
+      "path": "ae_scripts/fig12/plot_fig12_end2end.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "292b48b87f2b97de3af24835a878dab71221d9a1",
+      "size": 219,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/292b48b87f2b97de3af24835a878dab71221d9a1"
+    },
+    {
+      "path": "ae_scripts/fig12/reproduce_fig12.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "d0248cbdcc81537b2ecde933a651c4507655e387",
+      "size": 3442,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d0248cbdcc81537b2ecde933a651c4507655e387"
+    },
+    {
+      "path": "ae_scripts/fig12/standalone_plot_style.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a0d62edd580b0623428325f7db170dc46ef734e2",
+      "size": 6534,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a0d62edd580b0623428325f7db170dc46ef734e2"
+    },
+    {
+      "path": "ae_scripts/fig12/vllm_run_data.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "97abe32a06b99d7f88332f4fa5d23f2c5d2d6023",
+      "size": 12033,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/97abe32a06b99d7f88332f4fa5d23f2c5d2d6023"
+    },
+    {
+      "path": "ae_scripts/fig13",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f1163b6cab33661252546431d153a56286724871",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f1163b6cab33661252546431d153a56286724871"
+    },
+    {
+      "path": "ae_scripts/fig13/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2f4d3a2bb9c7c70b977db6e1aca07b7ae6971ead",
+      "size": 6429,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2f4d3a2bb9c7c70b977db6e1aca07b7ae6971ead"
+    },
+    {
+      "path": "ae_scripts/fig13/generate_kv_distributions.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e9b80141b08f112f2fbe59b42de6f7864d3a1b92",
+      "size": 3854,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e9b80141b08f112f2fbe59b42de6f7864d3a1b92"
+    },
+    {
+      "path": "ae_scripts/fig13/parse_phase_breakdown_profiles.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "af2bbe92aa0a8304486e07feec36dbf717ddeea4",
+      "size": 20699,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/af2bbe92aa0a8304486e07feec36dbf717ddeea4"
+    },
+    {
+      "path": "ae_scripts/fig13/run_two_node_quick_test.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "999ccdfe9c6e6376b62a6f948abefa979cc66204",
+      "size": 22697,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/999ccdfe9c6e6376b62a6f948abefa979cc66204"
+    },
+    {
+      "path": "ae_scripts/fig13/visualize_phase_breakdown_by_long_node.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "58d224e389c93e45cd63a703c365f181c5903a83",
+      "size": 11895,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/58d224e389c93e45cd63a703c365f181c5903a83"
+    },
+    {
+      "path": "ae_scripts/fig14",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5b40efdde53fd91e67859b71acfc75c08bc58e53",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/5b40efdde53fd91e67859b71acfc75c08bc58e53"
+    },
+    {
+      "path": "ae_scripts/fig14/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28eb6cc7fa240fa1983ecb534d1f309869ea61cb",
+      "size": 2458,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/28eb6cc7fa240fa1983ecb534d1f309869ea61cb"
+    },
+    {
+      "path": "ae_scripts/fig14/fig14_cases.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9c9297fac53d9b69e479fce02c7adfb7bdca7c4",
+      "size": 417,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d9c9297fac53d9b69e479fce02c7adfb7bdca7c4"
+    },
+    {
+      "path": "ae_scripts/fig14/inputs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3c75f33316d4b7f29ad4b34543dcfacfbee3b500",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/3c75f33316d4b7f29ad4b34543dcfacfbee3b500"
+    },
+    {
+      "path": "ae_scripts/fig14/inputs/issue01.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6ce6b4d6450afcde88d9d18abac43d5300fdea60",
+      "size": 1154923,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6ce6b4d6450afcde88d9d18abac43d5300fdea60"
+    },
+    {
+      "path": "ae_scripts/fig14/inputs/issue05.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "44de8e9d59a5ab5515bc9aa884e789a63b2f1694",
+      "size": 1166482,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/44de8e9d59a5ab5515bc9aa884e789a63b2f1694"
+    },
+    {
+      "path": "ae_scripts/fig14/nano_service_driver.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "0e37e4128bdc9f1e0ac067606fd4781cc6dda527",
+      "size": 2173,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0e37e4128bdc9f1e0ac067606fd4781cc6dda527"
+    },
+    {
+      "path": "ae_scripts/fig14/plot_fig14_from_service_logs.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a821aff92d5e9593cd97201a87d201290cdf0987",
+      "size": 57186,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a821aff92d5e9593cd97201a87d201290cdf0987"
+    },
+    {
+      "path": "ae_scripts/fig14/run_fig14.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5226aab4237b2efb52d6a88d41bec14a96540531",
+      "size": 21485,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5226aab4237b2efb52d6a88d41bec14a96540531"
+    },
+    {
+      "path": "ae_scripts/fig14/run_nano_e2e.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5771f3893e6b813029a2be1d0da883e187bc4e13",
+      "size": 22806,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5771f3893e6b813029a2be1d0da883e187bc4e13"
+    },
+    {
+      "path": "ae_scripts/fig15",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "06355efdc0af8d7b632ad4e02f5661209e8de589",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/06355efdc0af8d7b632ad4e02f5661209e8de589"
+    },
+    {
+      "path": "ae_scripts/fig15/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12dc0beff64be6f70ff71a7b2839820808392401",
+      "size": 3252,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/12dc0beff64be6f70ff71a7b2839820808392401"
+    },
+    {
+      "path": "ae_scripts/fig15/analyze_and_plot.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "0ed301c8731018caae20b23a8eef0e22666dea87",
+      "size": 19396,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0ed301c8731018caae20b23a8eef0e22666dea87"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "726e6b843f7a1bbd30ed808c3fc94d1fa4a869f8",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/726e6b843f7a1bbd30ed808c3fc94d1fa4a869f8"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a3179dea209b2f52923ccd31dfdeeb9ffe6c2206",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/a3179dea209b2f52923ccd31dfdeeb9ffe6c2206"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano/issue01",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9ccba29dc93f22ce80f011a4d08056094b7ab12c",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/9ccba29dc93f22ce80f011a4d08056094b7ab12c"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano/issue01/processed_input_3d.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9258fdd351d742507fad68d272c7ea8519362a06",
+      "size": 31332,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9258fdd351d742507fad68d272c7ea8519362a06"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano/issue05",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "43063d21f934eacfe2bbb1b0c8732b522ae27af8",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/43063d21f934eacfe2bbb1b0c8732b522ae27af8"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano/issue05/processed_input_3d.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "291c39f80a6433412f5031ca78268be39802590e",
+      "size": 15215,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/291c39f80a6433412f5031ca78268be39802590e"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano/short",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c1715a2493174eee7dd95b7aa5b5e535d3076b92",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/c1715a2493174eee7dd95b7aa5b5e535d3076b92"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/nano/short/processed_input_3d.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9631ac07697d5636c1e652c5f5c1a08fe8f10463",
+      "size": 61615,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9631ac07697d5636c1e652c5f5c1a08fe8f10463"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/vllm",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3d951fbdc66985098cf28157fdc4267916d82be9",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/3d951fbdc66985098cf28157fdc4267916d82be9"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/vllm/issue01.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bedae163f94903af219b965312cd3f511a99b4b9",
+      "size": 11995,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bedae163f94903af219b965312cd3f511a99b4b9"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/vllm/issue05.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0bd37790f209e9529f65a8e49639443240f330e5",
+      "size": 5782,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0bd37790f209e9529f65a8e49639443240f330e5"
+    },
+    {
+      "path": "ae_scripts/fig15/inputs/vllm/short.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "85983f7846919aa9c7d26539b1fcaaba58e24798",
+      "size": 23662,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/85983f7846919aa9c7d26539b1fcaaba58e24798"
+    },
+    {
+      "path": "ae_scripts/fig15/parse_nano_layer_breakdown.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a022a9a5e0bd69190b874568f3449f7c104c6b4e",
+      "size": 23108,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a022a9a5e0bd69190b874568f3449f7c104c6b4e"
+    },
+    {
+      "path": "ae_scripts/fig15/parse_vllm_iteration_breakdown.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "589ab5596d7aa1ed04075d86433b8e1c34c333b3",
+      "size": 30647,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/589ab5596d7aa1ed04075d86433b8e1c34c333b3"
+    },
+    {
+      "path": "ae_scripts/fig15/plot_latency_breakdown.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "74b4d18759df222e2bd716041596eff1a71829b7",
+      "size": 15278,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/74b4d18759df222e2bd716041596eff1a71829b7"
+    },
+    {
+      "path": "ae_scripts/fig15/run_nano_e2e_inputs.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "628b6915544f5537a67a78cd5c486d7b9db9878f",
+      "size": 19017,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/628b6915544f5537a67a78cd5c486d7b9db9878f"
+    },
+    {
+      "path": "ae_scripts/fig15/run_nano_profiling.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ba728eba1a8db4d7c57534c6cec040dc8fb8b803",
+      "size": 16848,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ba728eba1a8db4d7c57534c6cec040dc8fb8b803"
+    },
+    {
+      "path": "ae_scripts/fig15/run_vllm_profiling.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "f8dd2a477472638fcc59a7054effa3ac6ecdffca",
+      "size": 32952,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f8dd2a477472638fcc59a7054effa3ac6ecdffca"
+    },
+    {
+      "path": "ae_scripts/fig16",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2d01c700a59c59ffb550845adb543d6aeb01888a",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/2d01c700a59c59ffb550845adb543d6aeb01888a"
+    },
+    {
+      "path": "ae_scripts/fig16/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d2732d0b5fea1044d46688f9bd0193452853a002",
+      "size": 3563,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d2732d0b5fea1044d46688f9bd0193452853a002"
+    },
+    {
+      "path": "ae_scripts/fig16/bench_serving_overhead.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a9edf6bcd8d00f1c4c0e681318338c6b9dfe798f",
+      "size": 31208,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a9edf6bcd8d00f1c4c0e681318338c6b9dfe798f"
+    },
+    {
+      "path": "ae_scripts/fig16/reproduce_fig16.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e9804456c03742f8ffcc9073eccfdfe4ea6df506",
+      "size": 34518,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e9804456c03742f8ffcc9073eccfdfe4ea6df506"
+    },
+    {
+      "path": "ae_scripts/fig17",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8aefb3d5ae6475995001d8d6e0ff60156f25806b",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/8aefb3d5ae6475995001d8d6e0ff60156f25806b"
+    },
+    {
+      "path": "ae_scripts/fig17/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f2c116a14e56f2983b21ac56c39dc3c1e7b7ee5e",
+      "size": 1546,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f2c116a14e56f2983b21ac56c39dc3c1e7b7ee5e"
+    },
+    {
+      "path": "ae_scripts/fig17/bench_serving_overhead.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "c158f4fae6b3ed026165fe6ed5405df331eea10a",
+      "size": 10061,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c158f4fae6b3ed026165fe6ed5405df331eea10a"
+    },
+    {
+      "path": "ae_scripts/fig17/reproduce_fig17.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "63fab184d43837f23be845ea2038a52b0b4a3150",
+      "size": 29824,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/63fab184d43837f23be845ea2038a52b0b4a3150"
+    },
+    {
+      "path": "ae_scripts/fig18",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5a6f415c9358fad393ce1e04124a2976a0a98cec",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/5a6f415c9358fad393ce1e04124a2976a0a98cec"
+    },
+    {
+      "path": "ae_scripts/fig18/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20f40487996b62dd0c7db2ba6f2f8c53e6f4e5d9",
+      "size": 968,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/20f40487996b62dd0c7db2ba6f2f8c53e6f4e5d9"
+    },
+    {
+      "path": "ae_scripts/fig18/benchmark_fig18_dlslime.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "475960f7a27d955ab428c28fbb80bac47d8ae5f3",
+      "size": 14108,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/475960f7a27d955ab428c28fbb80bac47d8ae5f3"
+    },
+    {
+      "path": "ae_scripts/fig18/reproduce_fig18_dlslime.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5aa7447061d7995fde81b5e73eba741a51755424",
+      "size": 20400,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5aa7447061d7995fde81b5e73eba741a51755424"
+    },
+    {
+      "path": "ae_scripts/fig19",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a97bb2df691079e81328128e687f48ee2f76da14",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/a97bb2df691079e81328128e687f48ee2f76da14"
+    },
+    {
+      "path": "ae_scripts/fig19/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "39cf036f286e25f632d24aca972f209572026fb5",
+      "size": 6778,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/39cf036f286e25f632d24aca972f209572026fb5"
+    },
+    {
+      "path": "ae_scripts/fig19/benchmark_dlslime_all_to_all_buffer_cp_comm.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2df6d3a6b46bee978c87026f1374ddae936ae22d",
+      "size": 49276,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2df6d3a6b46bee978c87026f1374ddae936ae22d"
+    },
+    {
+      "path": "ae_scripts/fig19/benchmark_mla_cp_comm.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ab3a425a727096099b91be298933788f62a264fe",
+      "size": 26621,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ab3a425a727096099b91be298933788f62a264fe"
+    },
+    {
+      "path": "ae_scripts/fig19/benchmark_q_res_lse_latency.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "bbf262c0df6ac1c31e910b710d82153fd221bbc1",
+      "size": 40205,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bbf262c0df6ac1c31e910b710d82153fd221bbc1"
+    },
+    {
+      "path": "ae_scripts/fig19/collect_fig19_data.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "90b7c6baaac0605751a8bcb9de52ba87975bf69f",
+      "size": 66085,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/90b7c6baaac0605751a8bcb9de52ba87975bf69f"
+    },
+    {
+      "path": "ae_scripts/fig19/plot_fig19.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "629f910e0c97215d225d043f4587e7575d04c881",
+      "size": 22986,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/629f910e0c97215d225d043f4587e7575d04c881"
+    },
+    {
+      "path": "ae_scripts/fig19/run_fig19_e2e.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e7598bc8c167903e702430305cbd14bc6657690b",
+      "size": 10995,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e7598bc8c167903e702430305cbd14bc6657690b"
+    },
+    {
+      "path": "ae_scripts/fig20",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5c8fad4b27c89d144c9ee53584ea190ad91e4a80",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/5c8fad4b27c89d144c9ee53584ea190ad91e4a80"
+    },
+    {
+      "path": "ae_scripts/fig20/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ad36803c650e86aa0fe4adc80aec72931292cf21",
+      "size": 3313,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ad36803c650e86aa0fe4adc80aec72931292cf21"
+    },
+    {
+      "path": "ae_scripts/fig20/dbo_tpot_comparison.tsv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "02e6dcca45d236d74377169a0ba238db460172e7",
+      "size": 7547,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/02e6dcca45d236d74377169a0ba238db460172e7"
+    },
+    {
+      "path": "ae_scripts/fig20/dbo_tpot_comparison_issue1.tsv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "65c8639d6964f3bd22518d36f9d5083d126202f3",
+      "size": 7607,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/65c8639d6964f3bd22518d36f9d5083d126202f3"
+    },
+    {
+      "path": "ae_scripts/fig20/plot_dbo_tpot_comparison.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a155d2cb5cd83bd90f6e3a866e8f69e4a910b5f7",
+      "size": 41942,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a155d2cb5cd83bd90f6e3a866e8f69e4a910b5f7"
+    },
+    {
+      "path": "ae_scripts/fig20/plot_vllm_tbo_paper.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e9765d23875f3ef610e7c241f3687c0afc598d4e",
+      "size": 10812,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e9765d23875f3ef610e7c241f3687c0afc598d4e"
+    },
+    {
+      "path": "ae_scripts/fig20/run_fig20.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "3d438b2cc150ddb79b4744bdff4547d6bfe7e134",
+      "size": 23928,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3d438b2cc150ddb79b4744bdff4547d6bfe7e134"
+    },
+    {
+      "path": "ae_scripts/fig3",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ac86572633261114ae64931395b25ab692741984",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/ac86572633261114ae64931395b25ab692741984"
+    },
+    {
+      "path": "ae_scripts/fig3/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "418dbae86cf102c194d2387a3412347686713e12",
+      "size": 2333,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/418dbae86cf102c194d2387a3412347686713e12"
+    },
+    {
+      "path": "ae_scripts/fig3/attention",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2c7713413e4bc31db3930092f7783cdc0da7a3fc",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/2c7713413e4bc31db3930092f7783cdc0da7a3fc"
+    },
+    {
+      "path": "ae_scripts/fig3/attention/run_attention.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "6eb7dbf5d3014b3aee900063df78e470f17a7ae0",
+      "size": 7354,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6eb7dbf5d3014b3aee900063df78e470f17a7ae0"
+    },
+    {
+      "path": "ae_scripts/fig3/attention/run_attention_quick.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4c757c60a756c919741cefc0fad90d2b54790f03",
+      "size": 268,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4c757c60a756c919741cefc0fad90d2b54790f03"
+    },
+    {
+      "path": "ae_scripts/fig3/attention/validate_mla_benchmark_csv.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "9d05384aa9f1b86bac3014272ea71ee6e80a1b35",
+      "size": 3177,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9d05384aa9f1b86bac3014272ea71ee6e80a1b35"
+    },
+    {
+      "path": "ae_scripts/fig3/deepep",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2f8ae9978a2a66ce01edb8ff2b7c66b625d9b293",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/2f8ae9978a2a66ce01edb8ff2b7c66b625d9b293"
+    },
+    {
+      "path": "ae_scripts/fig3/deepep/launch_deepep.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "f38fa1f7e1cfb2487f3f28498e2ee39227ab127f",
+      "size": 19688,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f38fa1f7e1cfb2487f3f28498e2ee39227ab127f"
+    },
+    {
+      "path": "ae_scripts/fig3/deepep/run_deepep.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "9f34b921dcd07d817d2ba0e8e7ad57a629c765fc",
+      "size": 7831,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9f34b921dcd07d817d2ba0e8e7ad57a629c765fc"
+    },
+    {
+      "path": "ae_scripts/fig3/deepep/run_deepep_quick.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "90d6d147392ba5ea272ae874d6bca5c5b98095dd",
+      "size": 278,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/90d6d147392ba5ea272ae874d6bca5c5b98095dd"
+    },
+    {
+      "path": "ae_scripts/fig3/plot_fig3.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "c98a9c6cb210c68dab955e806a2632b73e2f258b",
+      "size": 15512,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c98a9c6cb210c68dab955e806a2632b73e2f258b"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "31b531d5ba38ac95e3cbaf28e7583106b7bd9ace",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/31b531d5ba38ac95e3cbaf28e7583106b7bd9ace"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/attention",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "16ba09f8f2c43b8e418fcd2c82ec91fbee918f15",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/16ba09f8f2c43b8e418fcd2c82ec91fbee918f15"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/attention/environment.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93fdf24f9407c6a78247dbdc835a971295ea1cc0",
+      "size": 2482,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/93fdf24f9407c6a78247dbdc835a971295ea1cc0"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/attention/external_flashmla_cudagraph_total_tokens.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d5e32d3ead533cd96737277672d19b0dea14685",
+      "size": 2198,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3d5e32d3ead533cd96737277672d19b0dea14685"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/deepep",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2ab2de03fca166055e2c838582e4ecaffc92303e",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/2ab2de03fca166055e2c838582e4ecaffc92303e"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/deepep/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "17a9321a05906bb28fdd0e091290c8c42320bac8",
+      "size": 808,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/17a9321a05906bb28fdd0e091290c8c42320bac8"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/deepep/node0_summary_rank0.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "87232e67d6bb61ba1ee17be5b78522005c919000",
+      "size": 3996,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/87232e67d6bb61ba1ee17be5b78522005c919000"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/deepep/node1_summary_rank8.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0ef020adcd5ffe928587c82d18e7aac53a62d3e",
+      "size": 3792,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a0ef020adcd5ffe928587c82d18e7aac53a62d3e"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/deepep/node2_summary_rank16.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0aba972de78ed2a3e2e6932471f75a67a6810953",
+      "size": 3996,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0aba972de78ed2a3e2e6932471f75a67a6810953"
+    },
+    {
+      "path": "ae_scripts/fig3/reference_results/deepep/node3_summary_rank24.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "29d2161298d7e6e7cb762a5b45e23e18bd5113b1",
+      "size": 3996,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/29d2161298d7e6e7cb762a5b45e23e18bd5113b1"
+    },
+    {
+      "path": "ae_scripts/fig3/requirements.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "074a469aae95489f1ab53714c101ca380bf70992",
+      "size": 49,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/074a469aae95489f1ab53714c101ca380bf70992"
+    },
+    {
+      "path": "ae_scripts/fig5",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "af27a459884ee3988a5ae8b0d6d98c37aae820cd",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/af27a459884ee3988a5ae8b0d6d98c37aae820cd"
+    },
+    {
+      "path": "ae_scripts/fig5/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "97bf6595e59a4e8230b7f93b427fdff125bc0309",
+      "size": 4107,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/97bf6595e59a4e8230b7f93b427fdff125bc0309"
+    },
+    {
+      "path": "ae_scripts/fig5/deepep",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "611749fc3d43536ab5833454ad59cc4fd89bd35c",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/611749fc3d43536ab5833454ad59cc4fd89bd35c"
+    },
+    {
+      "path": "ae_scripts/fig5/deepep/launch_deepep.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "74dafbe68b634e040734e933991faa26932e67e7",
+      "size": 19533,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/74dafbe68b634e040734e933991faa26932e67e7"
+    },
+    {
+      "path": "ae_scripts/fig5/deepep/run_deepep.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "cfe2ac19c2613589c350997c92bb8667122c598a",
+      "size": 10353,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/cfe2ac19c2613589c350997c92bb8667122c598a"
+    },
+    {
+      "path": "ae_scripts/fig5/extract_vllm_rank_snapshot.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ca1435ef396e70fe9180658044fac2a0f347100c",
+      "size": 10895,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ca1435ef396e70fe9180658044fac2a0f347100c"
+    },
+    {
+      "path": "ae_scripts/fig5/launch_vllm_e2e.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "bb661ffe496142c06639d3ced8ea2757d27587a0",
+      "size": 29528,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bb661ffe496142c06639d3ced8ea2757d27587a0"
+    },
+    {
+      "path": "ae_scripts/fig5/plot_fig5.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a0331e186bcbf87e18c25581a6b1d2d06c780888",
+      "size": 25089,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a0331e186bcbf87e18c25581a6b1d2d06c780888"
+    },
+    {
+      "path": "ae_scripts/fig5/reference_results",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3c057dd2c13ec5b332ecc07d0e64ccbba9d07b59",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/3c057dd2c13ec5b332ecc07d0e64ccbba9d07b59"
+    },
+    {
+      "path": "ae_scripts/fig5/reference_results/attention_rank_latency.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "de5b1ab0180bd34b99332716e4fab164f4952a8e",
+      "size": 2155,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/de5b1ab0180bd34b99332716e4fab164f4952a8e"
+    },
+    {
+      "path": "ae_scripts/fig5/reference_results/attention_snapshot_time60.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7635a3c4c8443a4c76ab45aeecb80cd730be3bef",
+      "size": 1111,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7635a3c4c8443a4c76ab45aeecb80cd730be3bef"
+    },
+    {
+      "path": "ae_scripts/fig5/reference_results/deepep_rank_latency.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3056bb852ab4862531800b7315244c9f9aff4fac",
+      "size": 456,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3056bb852ab4862531800b7315244c9f9aff4fac"
+    },
+    {
+      "path": "ae_scripts/fig5/reference_results/deepep_snapshot_time60.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9e757102e31c927ef5a2949ba567a07650eebf1",
+      "size": 938,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d9e757102e31c927ef5a2949ba567a07650eebf1"
+    },
+    {
+      "path": "ae_scripts/fig5/reference_results/hol_timeseries.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8d3590c18013418543492abffc4caf44ae50f6d9",
+      "size": 14944,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8d3590c18013418543492abffc4caf44ae50f6d9"
+    },
+    {
+      "path": "ae_scripts/fig5/reproduce_fig5.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4a8c148726773444fe350dfd7faa6c347414a912",
+      "size": 32146,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4a8c148726773444fe350dfd7faa6c347414a912"
+    },
+    {
+      "path": "ae_scripts/fig6",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f7ea9822db24d3cc1d899d94605719400a760826",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f7ea9822db24d3cc1d899d94605719400a760826"
+    },
+    {
+      "path": "ae_scripts/fig6/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b485a488c0e42a469617dcdd46e5273b438231d7",
+      "size": 1041,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b485a488c0e42a469617dcdd46e5273b438231d7"
+    },
+    {
+      "path": "ae_scripts/fig6/benchmark",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "351d2fdd33ef05c673ddcd67555b0af61c0a2cf6",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/351d2fdd33ef05c673ddcd67555b0af61c0a2cf6"
+    },
+    {
+      "path": "ae_scripts/fig6/benchmark/run_flashmla_dcp_bench.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5db59dc20fee11bfbb0580c928b4506e815a3b5f",
+      "size": 28222,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5db59dc20fee11bfbb0580c928b4506e815a3b5f"
+    },
+    {
+      "path": "ae_scripts/fig6/benchmark/run_flashmla_dcp_cudagraph_bench.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e312c80f81b4a99f4e7d96368950c9a7e35f977b",
+      "size": 19613,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e312c80f81b4a99f4e7d96368950c9a7e35f977b"
+    },
+    {
+      "path": "ae_scripts/fig6/reproduce_fig6.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5f9ba325fe1fb9072fdbf61845255071127c8ee2",
+      "size": 32922,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5f9ba325fe1fb9072fdbf61845255071127c8ee2"
+    },
+    {
+      "path": "ae_scripts/microbench",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "328b14262224daba6fb9718113582ce4cf71af7c",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/328b14262224daba6fb9718113582ce4cf71af7c"
+    },
+    {
+      "path": "ae_scripts/microbench/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "834ec347311f4395e68a9d5eb3eea7bb089c5996",
+      "size": 844,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/834ec347311f4395e68a9d5eb3eea7bb089c5996"
+    },
+    {
+      "path": "ae_scripts/microbench/attention",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "469258384147f3956ff3018288310f065783db11",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/469258384147f3956ff3018288310f065783db11"
+    },
+    {
+      "path": "ae_scripts/microbench/attention/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5dfbfe6cc83917d61cd5968981b3a1c284363319",
+      "size": 1204,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5dfbfe6cc83917d61cd5968981b3a1c284363319"
+    },
+    {
+      "path": "ae_scripts/microbench/attention/benchmark_flashmla.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "148045b5581c1e816cb605c51b1e38822551e6d4",
+      "size": 18382,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/148045b5581c1e816cb605c51b1e38822551e6d4"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "90bbd6df7a9abb5b3f8f81c5fcb46466f85d41ee",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/90bbd6df7a9abb5b3f8f81c5fcb46466f85d41ee"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3ad0800c05900fdf5909e207e59a00ecd28375c6",
+      "size": 2100,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3ad0800c05900fdf5909e207e59a00ecd28375c6"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/parse_low_latency_logs.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "21e2c1f97c305b43f3d022c4d23cb130797206dc",
+      "size": 6289,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/21e2c1f97c305b43f3d022c4d23cb130797206dc"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/run_low_latency_sweep.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2f97b1d5f088a9180e2073978a7e9fd56a58a51d",
+      "size": 9541,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2f97b1d5f088a9180e2073978a7e9fd56a58a51d"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/run_one_low_latency.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2869630aee32233f1f4da3b3eda9e6b44202bb3f",
+      "size": 4346,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2869630aee32233f1f4da3b3eda9e6b44202bb3f"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/third_party",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f42e6436635a688025092afe63fe61a485940f63",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f42e6436635a688025092afe63fe61a485940f63"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/third_party/deepep",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bdf8393f834ea3386a21e347e9f4bde3363756d4",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/bdf8393f834ea3386a21e347e9f4bde3363756d4"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/third_party/deepep/LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c48bdc9f6ef95f725096ff5434012da927b516f",
+      "size": 1065,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5c48bdc9f6ef95f725096ff5434012da927b516f"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/third_party/deepep/UPSTREAM.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9afba90935bc68c8d119f27c63ad91ce5604b4f7",
+      "size": 426,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9afba90935bc68c8d119f27c63ad91ce5604b4f7"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/third_party/deepep/test_low_latency.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "287bf131d10a01b7ebc666cad759b26656772a09",
+      "size": 19175,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/287bf131d10a01b7ebc666cad759b26656772a09"
+    },
+    {
+      "path": "ae_scripts/microbench/deepep/third_party/deepep/utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1390b2b9acb429eb0a874817ddcdb72554ca8048",
+      "size": 9161,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1390b2b9acb429eb0a874817ddcdb72554ca8048"
+    },
+    {
+      "path": "ae_scripts/paths.env.example",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c4fda80170e24cbce83376212c1086b22612e79d",
+      "size": 1294,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c4fda80170e24cbce83376212c1086b22612e79d"
+    },
+    {
+      "path": "ae_scripts/requirements.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c1e21229f9444cb2523859f3efd4670181185ef1",
+      "size": 18,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c1e21229f9444cb2523859f3efd4670181185ef1"
+    },
+    {
+      "path": "ae_scripts/run_dpsk_issue01_dp4sp8_sp_policy.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4222302f0fe1b1e6ddd3701824a928dff3b256db",
+      "size": 8996,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4222302f0fe1b1e6ddd3701824a928dff3b256db"
+    },
+    {
+      "path": "ae_scripts/start-e2e",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0d32ec82f28468f218b82fc46bd78127a9e06999",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/0d32ec82f28468f218b82fc46bd78127a9e06999"
+    },
+    {
+      "path": "ae_scripts/start-e2e/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c543dfa46c43c0098c4be523124bb3d4d6c8e693",
+      "size": 961,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c543dfa46c43c0098c4be523124bb3d4d6c8e693"
+    },
+    {
+      "path": "ae_scripts/start-e2e/nano",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f03b0d85255a8f061ed5a1986c6de91657636409",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f03b0d85255a8f061ed5a1986c6de91657636409"
+    },
+    {
+      "path": "ae_scripts/start-e2e/nano/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3744f9a4d9ec693465fccbb6022630c737c36fa3",
+      "size": 5286,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3744f9a4d9ec693465fccbb6022630c737c36fa3"
+    },
+    {
+      "path": "ae_scripts/start-e2e/nano/bench_serving_overhead.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "493e965249fbfb3582ca908b60b4ed87fd0f7456",
+      "size": 27331,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/493e965249fbfb3582ca908b60b4ed87fd0f7456"
+    },
+    {
+      "path": "ae_scripts/start-e2e/nano/run_kimi_e2e_rates.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "d408dfa14f90f36dd7d436c48d7e66d0d0e906cd",
+      "size": 11699,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d408dfa14f90f36dd7d436c48d7e66d0d0e906cd"
+    },
+    {
+      "path": "ae_scripts/start-e2e/vllm",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "cb044c6e658f619298357d6f5feba567165f09fb",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/cb044c6e658f619298357d6f5feba567165f09fb"
+    },
+    {
+      "path": "ae_scripts/start-e2e/vllm/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b6eefbd57604a1655fe993b4303cf1c928571d71",
+      "size": 6026,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b6eefbd57604a1655fe993b4303cf1c928571d71"
+    },
+    {
+      "path": "ae_scripts/start-e2e/vllm/launch_vllm_e2e.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2529b882e5d522faae5f1f97aa586a22a07fa2b6",
+      "size": 18678,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2529b882e5d522faae5f1f97aa586a22a07fa2b6"
+    },
+    {
+      "path": "ae_scripts/start-e2e/vllm/manual_multinode_poisson_runner.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "6c76ceffd8b4496f33d1a8952354a8ad012d7498",
+      "size": 145194,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6c76ceffd8b4496f33d1a8952354a8ad012d7498"
+    },
+    {
+      "path": "ae_scripts/start-e2e/vllm/offline_poisson_harness.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7b89937c4e906b6f07d9b53c6556c6486046ff7",
+      "size": 64667,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a7b89937c4e906b6f07d9b53c6556c6486046ff7"
+    },
+    {
+      "path": "ae_scripts/start-e2e/vllm/offline_profile_strategy_defaults.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ab8453593a8c39ad480436d66a5dd3cf5a961935",
+      "size": 1604,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ab8453593a8c39ad480436d66a5dd3cf5a961935"
+    },
+    {
+      "path": "ae_scripts/start-profile",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0d57617d80971ab2e5d31d4086de97694012e2ed",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/0d57617d80971ab2e5d31d4086de97694012e2ed"
+    },
+    {
+      "path": "ae_scripts/start-profile/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "080672c89fa26d6300dabdb9a9dfe87b4b5bdb69",
+      "size": 1902,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/080672c89fa26d6300dabdb9a9dfe87b4b5bdb69"
+    },
+    {
+      "path": "ae_scripts/start-profile/nano_dummy_prefill_profile.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5b7c22b00977e26f4110813ff3cece4fbc5f43f6",
+      "size": 10966,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5b7c22b00977e26f4110813ff3cece4fbc5f43f6"
+    },
+    {
+      "path": "ae_scripts/start-profile/profile_common.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "76cad8955c906b201b44f9903832a65ea247c40a",
+      "size": 2409,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/76cad8955c906b201b44f9903832a65ea247c40a"
+    },
+    {
+      "path": "ae_scripts/start-profile/run_nano_profiling.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ab0ee32d3183d85eb0a4b0b82562062bd56efe48",
+      "size": 7005,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ab0ee32d3183d85eb0a4b0b82562062bd56efe48"
+    },
+    {
+      "path": "ae_scripts/start-profile/run_vllm_profiling.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "563e49a7bd227c3e6ec8a73804ef1963c4067125",
+      "size": 7639,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/563e49a7bd227c3e6ec8a73804ef1963c4067125"
+    },
+    {
+      "path": "clean.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a6f47bfa3645a77f2179cb511bb1afa2cbaf8707",
+      "size": 1266,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a6f47bfa3645a77f2179cb511bb1afa2cbaf8707"
+    },
+    {
+      "path": "csrc",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c8bcee8088fbfc31401c496f7514316c2378f60b",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/c8bcee8088fbfc31401c496f7514316c2378f60b"
+    },
+    {
+      "path": "csrc/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06f9a7f02781231e590cf2a552fda63081df6953",
+      "size": 79,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/06f9a7f02781231e590cf2a552fda63081df6953"
+    },
+    {
+      "path": "csrc/nanodeploy",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d53d3fd2c3c383fde1045ec9de6b325241c39d36",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/d53d3fd2c3c383fde1045ec9de6b325241c39d36"
+    },
+    {
+      "path": "csrc/nanodeploy/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eed8029d568aaac2d6835514e67b172672b90445",
+      "size": 110,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/eed8029d568aaac2d6835514e67b172672b90445"
+    },
+    {
+      "path": "csrc/nanodeploy/logging.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84802cff19278eb495da620b0471c509b0c0593c",
+      "size": 10021,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/84802cff19278eb495da620b0471c509b0c0593c"
+    },
+    {
+      "path": "csrc/nanodeploy/metrics",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9d20fa75cc62ed6dc969d447246e03d6421e86ac",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/9d20fa75cc62ed6dc969d447246e03d6421e86ac"
+    },
+    {
+      "path": "csrc/nanodeploy/metrics/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3e51290496954dc7e2ee323298595e29137eba0e",
+      "size": 459,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3e51290496954dc7e2ee323298595e29137eba0e"
+    },
+    {
+      "path": "csrc/nanodeploy/metrics/sequence_metric.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4db8af6545b1943a9b9326bc686b8a759183d2ee",
+      "size": 9193,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4db8af6545b1943a9b9326bc686b8a759183d2ee"
+    },
+    {
+      "path": "csrc/nanodeploy/metrics/sequence_metric.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a4fe391feb8446d66aac1ec75e6b1f69ef5249f",
+      "size": 3287,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6a4fe391feb8446d66aac1ec75e6b1f69ef5249f"
+    },
+    {
+      "path": "csrc/nanodeploy/metrics/server_metric.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d941fbff0e1b7d482e3d00b624552fe4bff69f14",
+      "size": 7186,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d941fbff0e1b7d482e3d00b624552fe4bff69f14"
+    },
+    {
+      "path": "csrc/nanodeploy/metrics/server_metric.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7e3e1425e5b74b6ec0b430adfec185a9ebc20029",
+      "size": 2356,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7e3e1425e5b74b6ec0b430adfec185a9ebc20029"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "09ea720fb8352a3219d206ca72ea3017eafcafd8",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/09ea720fb8352a3219d206ca72ea3017eafcafd8"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea6e30fb6e9581ea442cd3a0c3cfa353c2001ca3",
+      "size": 624,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ea6e30fb6e9581ea442cd3a0c3cfa353c2001ca3"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/block.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e74ddca4553a49d2d067a439f529f6340f25594",
+      "size": 603,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9e74ddca4553a49d2d067a439f529f6340f25594"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/block.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d0a60cea18bb13ad14ddc4862563aec02de9e33e",
+      "size": 513,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d0a60cea18bb13ad14ddc4862563aec02de9e33e"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/block_manager.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c674ee9273676dea8ba6a3fce83badab2bfe45d6",
+      "size": 6054,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/c674ee9273676dea8ba6a3fce83badab2bfe45d6"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/block_manager.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a35519154c224ba883b168bc0db40de30237b79",
+      "size": 2041,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1a35519154c224ba883b168bc0db40de30237b79"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/scheduler.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "826078a993c628a98cb1a5f37962949d30bf7ac3",
+      "size": 27895,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/826078a993c628a98cb1a5f37962949d30bf7ac3"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/scheduler.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cd52426af4c09802fb3af541aebfd0688e04a60c",
+      "size": 7301,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/cd52426af4c09802fb3af541aebfd0688e04a60c"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/scheduler_utils.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f7fe459de5fa358c30e841c2d4d7ff7ab7f6eaa9",
+      "size": 10080,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f7fe459de5fa358c30e841c2d4d7ff7ab7f6eaa9"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/scheduler_utils.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "16366416a25dc6c69a0c82d0a87291a064dcdd17",
+      "size": 1613,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/16366416a25dc6c69a0c82d0a87291a064dcdd17"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/sp_state_manager.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d60e7d37732e48c56e4ab2cd5eb19ac7e7c1216b",
+      "size": 32054,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d60e7d37732e48c56e4ab2cd5eb19ac7e7c1216b"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/sp_state_manager.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d2eec00a971f3827f4b241c7da1bb6ac433a1316",
+      "size": 6005,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d2eec00a971f3827f4b241c7da1bb6ac433a1316"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/thread_pool.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f0512e4fbf2d9960ca0dda5f1e94fa91f972acf8",
+      "size": 2594,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f0512e4fbf2d9960ca0dda5f1e94fa91f972acf8"
+    },
+    {
+      "path": "csrc/nanodeploy/scheduler/xxhash.hpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6033d85f51660de8580a8c2e896de2a520ca0e72",
+      "size": 77828,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6033d85f51660de8580a8c2e896de2a520ca0e72"
+    },
+    {
+      "path": "csrc/nanodeploy/sequence",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d6a8df8053e81a2239ead8d1a58db54bff58d762",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/d6a8df8053e81a2239ead8d1a58db54bff58d762"
+    },
+    {
+      "path": "csrc/nanodeploy/sequence/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d8767dd15fdac1a9deddf9cde67968e37103cd8",
+      "size": 456,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9d8767dd15fdac1a9deddf9cde67968e37103cd8"
+    },
+    {
+      "path": "csrc/nanodeploy/sequence/sequence.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "958b0a8f310348bd2212b7ca648805d9866e1369",
+      "size": 6995,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/958b0a8f310348bd2212b7ca648805d9866e1369"
+    },
+    {
+      "path": "csrc/nanodeploy/sequence/sequence.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7d4819b8f65c083fd8570a362fad19f1ba25e22",
+      "size": 7667,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d7d4819b8f65c083fd8570a362fad19f1ba25e22"
+    },
+    {
+      "path": "csrc/nanodeploy/sequence/serialization.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "13786579cc9925d9f3df4ff5f7596e06739fa564",
+      "size": 12395,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/13786579cc9925d9f3df4ff5f7596e06739fa564"
+    },
+    {
+      "path": "csrc/nanodeploy/sequence/serialization.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5b1816ee43ea5ff50a7ef2e775ee33327921386",
+      "size": 1913,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a5b1816ee43ea5ff50a7ef2e775ee33327921386"
+    },
+    {
+      "path": "csrc/nanodeploy/worker",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ae2fec922cf20b4a7286408cc856131f38eea2bc",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/ae2fec922cf20b4a7286408cc856131f38eea2bc"
+    },
+    {
+      "path": "csrc/nanodeploy/worker/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "803ff3dbc2be118a6a48f99a4eee71e396bf7433",
+      "size": 508,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/803ff3dbc2be118a6a48f99a4eee71e396bf7433"
+    },
+    {
+      "path": "csrc/nanodeploy/worker/model_runner_utils.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8fc134d9e248d3d49ee675d396c3d4d113656a38",
+      "size": 14702,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8fc134d9e248d3d49ee675d396c3d4d113656a38"
+    },
+    {
+      "path": "csrc/nanodeploy/worker/model_runner_utils.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70be609345236d9bbc0fe7ba60eeb5a890e165de",
+      "size": 2577,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/70be609345236d9bbc0fe7ba60eeb5a890e165de"
+    },
+    {
+      "path": "csrc/python",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "62d6c538ae8ca01582037a06c92656cede8e883f",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/62d6c538ae8ca01582037a06c92656cede8e883f"
+    },
+    {
+      "path": "csrc/python/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46b7fcabd31741af4e02cb9785f28894610da3fb",
+      "size": 754,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/46b7fcabd31741af4e02cb9785f28894610da3fb"
+    },
+    {
+      "path": "csrc/python/block_manager_binding.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "363ac03489926241bfb7af4f971512af2d8f1dd7",
+      "size": 1979,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/363ac03489926241bfb7af4f971512af2d8f1dd7"
+    },
+    {
+      "path": "csrc/python/metric_binding.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4be5db8156a23ba02e4d0f998e40e368f66ed5b3",
+      "size": 8527,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4be5db8156a23ba02e4d0f998e40e368f66ed5b3"
+    },
+    {
+      "path": "csrc/python/model_runner_binding.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a4b4171399e8a038ac9282133211b5b2fc968c5d",
+      "size": 3271,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a4b4171399e8a038ac9282133211b5b2fc968c5d"
+    },
+    {
+      "path": "csrc/python/module.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2a6b6e978282ebc4f3fcb687939c658f343a6a13",
+      "size": 584,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2a6b6e978282ebc4f3fcb687939c658f343a6a13"
+    },
+    {
+      "path": "csrc/python/opaque_types.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8728a5e89808fb38c3f448c39da3d707626494d8",
+      "size": 431,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8728a5e89808fb38c3f448c39da3d707626494d8"
+    },
+    {
+      "path": "csrc/python/scheduler_binding.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e3c8de3fd2eac5b46eee9bdf6f656bc44a4f83d3",
+      "size": 11179,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e3c8de3fd2eac5b46eee9bdf6f656bc44a4f83d3"
+    },
+    {
+      "path": "csrc/python/sequence_binding.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "233f23fd2d573bf460de1b3ce9462d33d26c13d2",
+      "size": 16372,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/233f23fd2d573bf460de1b3ce9462d33d26c13d2"
+    },
+    {
+      "path": "csrc/python/sp_state_manager_binding.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f24a7f3677fc218b0e06cf9f90c342231d0ff96",
+      "size": 9898,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4f24a7f3677fc218b0e06cf9f90c342231d0ff96"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ace5fcb05566dc9dc51fa3697a5b45e17d7a2ad4",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/ace5fcb05566dc9dc51fa3697a5b45e17d7a2ad4"
+    },
+    {
+      "path": "docs/DLSlime_MLA_SP_All2All_Migration_Plan.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ef3201e1bde35f3af26712cd1717b125c73111f",
+      "size": 33315,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7ef3201e1bde35f3af26712cd1717b125c73111f"
+    },
+    {
+      "path": "docs/DLSlime_RPC_Decode_BlockTable_Optimization_Fix_Plan.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72654e69e64410e288bbb7c6e4716360371423e8",
+      "size": 10135,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/72654e69e64410e288bbb7c6e4716360371423e8"
+    },
+    {
+      "path": "docs/DeepSeek_SP_HaoBasic_Offsets_Design.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7000c952c8003537f5a39f0b1a6262fdfaf14d56",
+      "size": 17762,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7000c952c8003537f5a39f0b1a6262fdfaf14d56"
+    },
+    {
+      "path": "docs/MLA_SP_Q_All2All_HaoBasic_Align_Legacy_Design.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c72a17c3065fcb2a777a78522509b4fc4ed0874",
+      "size": 14535,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6c72a17c3065fcb2a777a78522509b4fc4ed0874"
+    },
+    {
+      "path": "docs/MLA_SP_Q_Offsets_OptimizeDecodeBlockTable_HaoBasic_Analysis.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "737089bdce1e45e6e76bf36a294414d88dcabe02",
+      "size": 16633,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/737089bdce1e45e6e76bf36a294414d88dcabe02"
+    },
+    {
+      "path": "docs/mla_sp_all2all_offsets_analysis.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "74bbabe18d4e1aaa4856cf9ca3cb9a0ce141c4ec",
+      "size": 23923,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/74bbabe18d4e1aaa4856cf9ca3cb9a0ce141c4ec"
+    },
+    {
+      "path": "examples",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ce2107c629608d75b0bb9b10d069edbe8f28fd36",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/ce2107c629608d75b0bb9b10d069edbe8f28fd36"
+    },
+    {
+      "path": "examples/bench_2seq.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d4bb60a6c6542a09e0e56a728d2e96468bdeb04",
+      "size": 17467,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6d4bb60a6c6542a09e0e56a728d2e96468bdeb04"
+    },
+    {
+      "path": "examples/bench_pd_serving.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a24dd8c05c0b476c85e67194069775976b21049f",
+      "size": 27950,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a24dd8c05c0b476c85e67194069775976b21049f"
+    },
+    {
+      "path": "examples/bench_serving.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "904e7d152cebf89176cc5b4ffecbf64f96bc2427",
+      "size": 20041,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/904e7d152cebf89176cc5b4ffecbf64f96bc2427"
+    },
+    {
+      "path": "examples/bench_serving_overhead.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9390754614401833fdd708214c50965d46562787",
+      "size": 19898,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9390754614401833fdd708214c50965d46562787"
+    },
+    {
+      "path": "examples/data",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f3a4116d109d7495f157e2d98afc69bff39a5d8a",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f3a4116d109d7495f157e2d98afc69bff39a5d8a"
+    },
+    {
+      "path": "examples/data/sharegpt_complete_101.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "53ea2d1bd6091a80b904b7a49e8af766f1e3902f",
+      "size": 150011,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/53ea2d1bd6091a80b904b7a49e8af766f1e3902f"
+    },
+    {
+      "path": "examples/dummy_prefill.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4f23adc6c0b0ff14b87fac0ea79aa109a58d90da",
+      "size": 8496,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4f23adc6c0b0ff14b87fac0ea79aa109a58d90da"
+    },
+    {
+      "path": "examples/dummy_prefill_profile.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "71aa8b5421a843fb12ff228b615f09d01592fb30",
+      "size": 9874,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/71aa8b5421a843fb12ff228b615f09d01592fb30"
+    },
+    {
+      "path": "examples/hierarchical_lifecycle.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d2a2fd982db21305063073429324767cd3ba4eac",
+      "size": 8744,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d2a2fd982db21305063073429324767cd3ba4eac"
+    },
+    {
+      "path": "examples/mixed_dataset.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "f423f8a7414d85842e961d1bbc006fdf15576002",
+      "size": 3039,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f423f8a7414d85842e961d1bbc006fdf15576002"
+    },
+    {
+      "path": "examples/pd_disagg.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "146f945db657c6642fc0ce356faac1c4f47f6a90",
+      "size": 15113,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/146f945db657c6642fc0ce356faac1c4f47f6a90"
+    },
+    {
+      "path": "examples/pd_disagg_deepseek_v3.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7d88fee0657207c099edf17b535822bb67c9746",
+      "size": 14307,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e7d88fee0657207c099edf17b535822bb67c9746"
+    },
+    {
+      "path": "examples/pd_disagg_deepseek_v3_parallel.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "918d0201410cafc3fd0db0bb796108d7c647fb51",
+      "size": 20617,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/918d0201410cafc3fd0db0bb796108d7c647fb51"
+    },
+    {
+      "path": "examples/pd_non_disagg.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "8d4e4cc7ea3364e1e609a16d96bbcafd504294be",
+      "size": 1972,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8d4e4cc7ea3364e1e609a16d96bbcafd504294be"
+    },
+    {
+      "path": "examples/per_rank_seq_lens_example.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f6cd1c41d2fc7bbb584fba218bfa36a60c941bc2",
+      "size": 1402,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f6cd1c41d2fc7bbb584fba218bfa36a60c941bc2"
+    },
+    {
+      "path": "nanodeploy",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bc0e2f0ebfc0b689df3a3765769103dcefa973bc",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/bc0e2f0ebfc0b689df3a3765769103dcefa973bc"
+    },
+    {
+      "path": "nanodeploy/__init__.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4fa8f3817ef91ef28590bf9cffeb416429df3a1e",
+      "size": 517,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4fa8f3817ef91ef28590bf9cffeb416429df3a1e"
+    },
+    {
+      "path": "nanodeploy/_cpp",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3c7d4d5e7343831dd000f91cf3a04f194f916ce6",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/3c7d4d5e7343831dd000f91cf3a04f194f916ce6"
+    },
+    {
+      "path": "nanodeploy/_cpp/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "65f96fdcd2088d521205193081d7b41a0305a18d",
+      "size": 468,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/65f96fdcd2088d521205193081d7b41a0305a18d"
+    },
+    {
+      "path": "nanodeploy/_nanodeploy_cpp.pyi",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3b6efef72dc212bccf3a21db2520175c2b5714a5",
+      "size": 38914,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3b6efef72dc212bccf3a21db2520175c2b5714a5"
+    },
+    {
+      "path": "nanodeploy/config.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "0ae3d98922e20231ee01005f2bb22e189fe63535",
+      "size": 21099,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0ae3d98922e20231ee01005f2bb22e189fe63535"
+    },
+    {
+      "path": "nanodeploy/endpoint",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0beee10c528a0ac2c1b7a6ba25c601f3b3c143d1",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/0beee10c528a0ac2c1b7a6ba25c601f3b3c143d1"
+    },
+    {
+      "path": "nanodeploy/endpoint/rpc_endpoint.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5a216c2524b1d9b61584002cfac510db54e83196",
+      "size": 5882,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5a216c2524b1d9b61584002cfac510db54e83196"
+    },
+    {
+      "path": "nanodeploy/engine",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "702de4f5fff550eafd722b71ff4b7a679ac7291f",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/702de4f5fff550eafd722b71ff4b7a679ac7291f"
+    },
+    {
+      "path": "nanodeploy/engine/__init__.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "nanodeploy/engine/block_manager.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ade40efdb9b1c4518bd9280649d215c426b2c5d4",
+      "size": 49,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ade40efdb9b1c4518bd9280649d215c426b2c5d4"
+    },
+    {
+      "path": "nanodeploy/engine/decode_coordinator.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5be6cb113f03d76a0cea4c563e0200f0bbc59c7e",
+      "size": 5942,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5be6cb113f03d76a0cea4c563e0200f0bbc59c7e"
+    },
+    {
+      "path": "nanodeploy/engine/deployment_manager.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ab6f3844b7918a1d174ef2e4e093b8b110edc48",
+      "size": 28459,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9ab6f3844b7918a1d174ef2e4e093b8b110edc48"
+    },
+    {
+      "path": "nanodeploy/engine/execution_boundary.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12e1a8ea92461f96cd1eb87736967fe3e1ecb58d",
+      "size": 1735,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/12e1a8ea92461f96cd1eb87736967fe3e1ecb58d"
+    },
+    {
+      "path": "nanodeploy/engine/frontend_transport.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2909e694a55547a8d0a259f58bd48d77f1e9630e",
+      "size": 33624,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2909e694a55547a8d0a259f58bd48d77f1e9630e"
+    },
+    {
+      "path": "nanodeploy/engine/hierarchical_contract.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "892e4f3fa25bc9f3c5139b95aaa4c873ca55f0b1",
+      "size": 18380,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/892e4f3fa25bc9f3c5139b95aaa4c873ca55f0b1"
+    },
+    {
+      "path": "nanodeploy/engine/llm_engine.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5f9688e78b4c2242a75561bfd01c1e6c3f2d28d3",
+      "size": 53383,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5f9688e78b4c2242a75561bfd01c1e6c3f2d28d3"
+    },
+    {
+      "path": "nanodeploy/engine/local_engine.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bcd4136f4bbe8293fb478b312f1fc1d8787d14bc",
+      "size": 74889,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bcd4136f4bbe8293fb478b312f1fc1d8787d14bc"
+    },
+    {
+      "path": "nanodeploy/engine/local_executor.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc832840634405d6463647dc9fcad09777eca337",
+      "size": 25222,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/dc832840634405d6463647dc9fcad09777eca337"
+    },
+    {
+      "path": "nanodeploy/engine/local_scheduler.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45c5c47ab601e473d97d647293293c9ec9809665",
+      "size": 51252,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/45c5c47ab601e473d97d647293293c9ec9809665"
+    },
+    {
+      "path": "nanodeploy/engine/ray_executor.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ec42b91b708bbcdd895f98422a5cacc058717c4f",
+      "size": 18142,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ec42b91b708bbcdd895f98422a5cacc058717c4f"
+    },
+    {
+      "path": "nanodeploy/engine/scheduler.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "9377dbc352ee5303156239b9c502813935192e14",
+      "size": 2867,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9377dbc352ee5303156239b9c502813935192e14"
+    },
+    {
+      "path": "nanodeploy/engine/sequence.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "d504edf2cea9b224071976e09ed5bab82bc43ee9",
+      "size": 1060,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d504edf2cea9b224071976e09ed5bab82bc43ee9"
+    },
+    {
+      "path": "nanodeploy/engine/topology.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6574ccc83b038cd316d81079207e2cc304d71ece",
+      "size": 4412,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6574ccc83b038cd316d81079207e2cc304d71ece"
+    },
+    {
+      "path": "nanodeploy/engine/worker_transport.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4395ca7ef6f0a8e02f4937aba4e61cf3ba51b818",
+      "size": 31176,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4395ca7ef6f0a8e02f4937aba4e61cf3ba51b818"
+    },
+    {
+      "path": "nanodeploy/kernels",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a853298050485030ea5be3ef189e1def8cd19f8b",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/a853298050485030ea5be3ef189e1def8cd19f8b"
+    },
+    {
+      "path": "nanodeploy/kernels/__init__.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "nanodeploy/kernels/attention.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4520fdbf9d5351a057db8fc12a142c6dbbec827e",
+      "size": 3353,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4520fdbf9d5351a057db8fc12a142c6dbbec827e"
+    },
+    {
+      "path": "nanodeploy/kernels/block_gemm_fp8.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a2fcb271f914012d1edcbe741a33aeb9175fddf1",
+      "size": 4395,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a2fcb271f914012d1edcbe741a33aeb9175fddf1"
+    },
+    {
+      "path": "nanodeploy/kernels/copy.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "92954408b44556d52ea0b255293afb69704da91e",
+      "size": 10032,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/92954408b44556d52ea0b255293afb69704da91e"
+    },
+    {
+      "path": "nanodeploy/kernels/deep_gemm_backend.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "79d343f3430041bec1a4d0f33b5b98dde3f7f8ba",
+      "size": 3641,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/79d343f3430041bec1a4d0f33b5b98dde3f7f8ba"
+    },
+    {
+      "path": "nanodeploy/kernels/kvcache.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ca41f495b27f00bff1ca34b7b341bc07bd591c1e",
+      "size": 2928,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ca41f495b27f00bff1ca34b7b341bc07bd591c1e"
+    },
+    {
+      "path": "nanodeploy/kernels/layernorm.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f032e564a16d6cacbec82866e5df52b14eb26d17",
+      "size": 3247,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f032e564a16d6cacbec82866e5df52b14eb26d17"
+    },
+    {
+      "path": "nanodeploy/kernels/moe_fp8.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6dd8ed79998c56d83adaa74aa63679baad2cd255",
+      "size": 20045,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6dd8ed79998c56d83adaa74aa63679baad2cd255"
+    },
+    {
+      "path": "nanodeploy/kernels/sp_graph_metadata.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9dc3cb4d1499d50805598d219a0f56f056891a7b",
+      "size": 8108,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9dc3cb4d1499d50805598d219a0f56f056891a7b"
+    },
+    {
+      "path": "nanodeploy/kernels/utils.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "d0998fe621121c468673cad2e42a795151dcc950",
+      "size": 1510,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d0998fe621121c468673cad2e42a795151dcc950"
+    },
+    {
+      "path": "nanodeploy/layers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6b6246eede5fa980c3aac07c964e045621074ca0",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/6b6246eede5fa980c3aac07c964e045621074ca0"
+    },
+    {
+      "path": "nanodeploy/layers/activation.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5ad7972ad3666e54c7f0d7c7c6d7af94a3236829",
+      "size": 298,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5ad7972ad3666e54c7f0d7c7c6d7af94a3236829"
+    },
+    {
+      "path": "nanodeploy/layers/attention.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "03d9767afc03db9cb71dd2360308103f9de862ec",
+      "size": 28016,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/03d9767afc03db9cb71dd2360308103f9de862ec"
+    },
+    {
+      "path": "nanodeploy/layers/deepep_moe.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61171338928ffa3c9cd2cd2b6f0907631cc02caf",
+      "size": 10431,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/61171338928ffa3c9cd2cd2b6f0907631cc02caf"
+    },
+    {
+      "path": "nanodeploy/layers/embed_head.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "b2482ec5959d62881ba0181c6312f6f45433b6c8",
+      "size": 2860,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b2482ec5959d62881ba0181c6312f6f45433b6c8"
+    },
+    {
+      "path": "nanodeploy/layers/layernorm.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "95cee33f713e864a5250f2a837536c6245c6244c",
+      "size": 2547,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/95cee33f713e864a5250f2a837536c6245c6244c"
+    },
+    {
+      "path": "nanodeploy/layers/linear.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "076708b71e8b6ce7c1d1c2935bba1980b970237e",
+      "size": 13551,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/076708b71e8b6ce7c1d1c2935bba1980b970237e"
+    },
+    {
+      "path": "nanodeploy/layers/rotary_embedding.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "69a8cd788485da4460d72c50624823d6034461cd",
+      "size": 5701,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/69a8cd788485da4460d72c50624823d6034461cd"
+    },
+    {
+      "path": "nanodeploy/layers/sampler.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2dabf9661a09aeef4705278d129f2bebb592ecd0",
+      "size": 498,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2dabf9661a09aeef4705278d129f2bebb592ecd0"
+    },
+    {
+      "path": "nanodeploy/layers/token_dispatcher.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5712b3a268d2570f801431cf7263313ab028f9e2",
+      "size": 7153,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5712b3a268d2570f801431cf7263313ab028f9e2"
+    },
+    {
+      "path": "nanodeploy/llm.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "9f19f8d354679228c2996502a0ac7585eddf3116",
+      "size": 89,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9f19f8d354679228c2996502a0ac7585eddf3116"
+    },
+    {
+      "path": "nanodeploy/logging.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "adcf1efb7e77a243d777a9a3d4f3bef08cc89475",
+      "size": 8726,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/adcf1efb7e77a243d777a9a3d4f3bef08cc89475"
+    },
+    {
+      "path": "nanodeploy/metrics.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "8fa5bff3911687030e1bf495308bc57506454883",
+      "size": 4455,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8fa5bff3911687030e1bf495308bc57506454883"
+    },
+    {
+      "path": "nanodeploy/models",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "44717b44070fb81a04aaf6e0ecf1cd68b4a47d7c",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/44717b44070fb81a04aaf6e0ecf1cd68b4a47d7c"
+    },
+    {
+      "path": "nanodeploy/models/deepseek_v2.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "79e970b6c851dfdb71a18f4c9696756f11dbcf0b",
+      "size": 33618,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/79e970b6c851dfdb71a18f4c9696756f11dbcf0b"
+    },
+    {
+      "path": "nanodeploy/models/quant_config.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "36a19459d350d8278fe5a1ad98150b4a72af238b",
+      "size": 620,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/36a19459d350d8278fe5a1ad98150b4a72af238b"
+    },
+    {
+      "path": "nanodeploy/models/qwen3.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "5b21bedf5c369eee53cf55ce37d1f135f732c5d0",
+      "size": 7482,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5b21bedf5c369eee53cf55ce37d1f135f732c5d0"
+    },
+    {
+      "path": "nanodeploy/models/qwen3_moe.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "fbebf2cf73d71567706660dedee0854749b91e8b",
+      "size": 19734,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/fbebf2cf73d71567706660dedee0854749b91e8b"
+    },
+    {
+      "path": "nanodeploy/models/weight_loadable.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "39a9dfcb1da8cfee2128d92bb8a078e902818633",
+      "size": 1489,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/39a9dfcb1da8cfee2128d92bb8a078e902818633"
+    },
+    {
+      "path": "nanodeploy/router",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8bef4eafe413396abac7a22065020a6b427310b8",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/8bef4eafe413396abac7a22065020a6b427310b8"
+    },
+    {
+      "path": "nanodeploy/router/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7174bc7c5bd90d54ac56612b2134ef85feb13888",
+      "size": 171,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7174bc7c5bd90d54ac56612b2134ef85feb13888"
+    },
+    {
+      "path": "nanodeploy/router/admission_planner.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1427b8bd2c9a17d8aec86decdfa50d233d5421b7",
+      "size": 15998,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1427b8bd2c9a17d8aec86decdfa50d233d5421b7"
+    },
+    {
+      "path": "nanodeploy/router/request_router.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "463112d52956488d320b9b4a38217b181a3dca82",
+      "size": 58786,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/463112d52956488d320b9b4a38217b181a3dca82"
+    },
+    {
+      "path": "nanodeploy/sampling_params.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "1654ab054e6b7a9e2dcce061c0181ff84d42be45",
+      "size": 269,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1654ab054e6b7a9e2dcce061c0181ff84d42be45"
+    },
+    {
+      "path": "nanodeploy/worker",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f794f6f31f989682f0f7a343c4bbbe5281295ec0",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f794f6f31f989682f0f7a343c4bbbe5281295ec0"
+    },
+    {
+      "path": "nanodeploy/worker/cache.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "28c3775b7438660116df86df50d7b6f121669b49",
+      "size": 13094,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/28c3775b7438660116df86df50d7b6f121669b49"
+    },
+    {
+      "path": "nanodeploy/worker/context.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "f62afbe7ea316ddf1c9a2dd3261774e2fdd2c7c2",
+      "size": 5074,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f62afbe7ea316ddf1c9a2dd3261774e2fdd2c7c2"
+    },
+    {
+      "path": "nanodeploy/worker/decode_backend_compat.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d6624039bc708ddfca2d0498002cbe42fce8336",
+      "size": 8762,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1d6624039bc708ddfca2d0498002cbe42fce8336"
+    },
+    {
+      "path": "nanodeploy/worker/distributed.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "05da57fc20c265963d3ed952d0a0a57ce8e0421f",
+      "size": 6363,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/05da57fc20c265963d3ed952d0a0a57ce8e0421f"
+    },
+    {
+      "path": "nanodeploy/worker/ep_context.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "caadcb153fcc9fd69582f592ec026b51341edb58",
+      "size": 7820,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/caadcb153fcc9fd69582f592ec026b51341edb58"
+    },
+    {
+      "path": "nanodeploy/worker/loader.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "f503f69439af2262d702294f1cb4b043704744e1",
+      "size": 11513,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f503f69439af2262d702294f1cb4b043704744e1"
+    },
+    {
+      "path": "nanodeploy/worker/mla_metadata.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ca55c4db160329cf432c2555467a2289963251d7",
+      "size": 2556,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ca55c4db160329cf432c2555467a2289963251d7"
+    },
+    {
+      "path": "nanodeploy/worker/model_runner.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "430d6099114f6577dd291c2a11e6e279f0eb1b4e",
+      "size": 95115,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/430d6099114f6577dd291c2a11e6e279f0eb1b4e"
+    },
+    {
+      "path": "nanodeploy/worker/prefill_logits.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e413f234310f509a3b912b3327cad5864658e561",
+      "size": 291,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e413f234310f509a3b912b3327cad5864658e561"
+    },
+    {
+      "path": "nanodeploy/worker/random_seed.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e09220db663907525087c75b7b1fa114f96e9905",
+      "size": 344,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e09220db663907525087c75b7b1fa114f96e9905"
+    },
+    {
+      "path": "nanodeploy/worker/runner_config.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "9f658ef6d5179eb280cb7254b8dc1e996a7c5352",
+      "size": 1110,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9f658ef6d5179eb280cb7254b8dc1e996a7c5352"
+    },
+    {
+      "path": "nanodeploy/worker/sp_backend.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83583fa6a61a3a9811cf209fbb2589440651b2bc",
+      "size": 23534,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/83583fa6a61a3a9811cf209fbb2589440651b2bc"
+    },
+    {
+      "path": "nanodeploy/worker/sp_context.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "3de7d2b6780a285e9044c50f6efb0819e877ab2c",
+      "size": 3015,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3de7d2b6780a285e9044c50f6efb0819e877ab2c"
+    },
+    {
+      "path": "nanodeploy/worker/sp_graph_policy.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4775fb44f1316c1d4aecc92b6c32d01caead9268",
+      "size": 8143,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4775fb44f1316c1d4aecc92b6c32d01caead9268"
+    },
+    {
+      "path": "pyproject.toml",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "f7837de175597de3573090bdbd89ccbd9c907a95",
+      "size": 1432,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/f7837de175597de3573090bdbd89ccbd9c907a95"
+    },
+    {
+      "path": "scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a716dd59e56dd26e52b14820472d28cd18f9816e",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/a716dd59e56dd26e52b14820472d28cd18f9816e"
+    },
+    {
+      "path": "scripts/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2739ca53abcc580688d06706286915b3ee740d34",
+      "size": 9488,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2739ca53abcc580688d06706286915b3ee740d34"
+    },
+    {
+      "path": "scripts/_sp_graph_metadata_injection_fused.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "206b283a0b08be138957c739ff8bde8cc7a8432f",
+      "size": 15012,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/206b283a0b08be138957c739ff8bde8cc7a8432f"
+    },
+    {
+      "path": "scripts/benchmark_flashmla_cudagraph_ab.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "87cb9cab6dc3ff1b7410d58516172b5eb29cd880",
+      "size": 8097,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/87cb9cab6dc3ff1b7410d58516172b5eb29cd880"
+    },
+    {
+      "path": "scripts/benchmark_least_batch_cpu.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b2a3784dbe8dfb73cc48a5d7f3e9f74ad309653f",
+      "size": 23581,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b2a3784dbe8dfb73cc48a5d7f3e9f74ad309653f"
+    },
+    {
+      "path": "scripts/benchmark_least_batch_ray_cpu.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0b5fef740728672c3750b362a90efdbc5e5f61cf",
+      "size": 23484,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0b5fef740728672c3750b362a90efdbc5e5f61cf"
+    },
+    {
+      "path": "scripts/benchmark_sp_graph_metadata_fusion.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "977764b29754b598398e769a35f0913e2d849c76",
+      "size": 32436,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/977764b29754b598398e769a35f0913e2d849c76"
+    },
+    {
+      "path": "scripts/benchmark_sp_graph_metadata_injection_sweep.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8441207140ed273c1ebf9db9ca790f22ea3a0ce7",
+      "size": 16553,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8441207140ed273c1ebf9db9ca790f22ea3a0ce7"
+    },
+    {
+      "path": "scripts/benchmark_sp_graph_runtime_overheads.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24900cce3b5bb222205999078f2caf2fbce97975",
+      "size": 24492,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/24900cce3b5bb222205999078f2caf2fbce97975"
+    },
+    {
+      "path": "scripts/decentralized_control_plane",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "61f6d03b1134b14dda3ac4be6f36440639b8197f",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/61f6d03b1134b14dda3ac4be6f36440639b8197f"
+    },
+    {
+      "path": "scripts/decentralized_control_plane/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83af209253ae6de36bad7da3e8172af8c9f3e52e",
+      "size": 3078,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/83af209253ae6de36bad7da3e8172af8c9f3e52e"
+    },
+    {
+      "path": "scripts/decentralized_control_plane/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45f0ffa3fad0d49438b6545e8a16a50fc507f4c6",
+      "size": 61,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/45f0ffa3fad0d49438b6545e8a16a50fc507f4c6"
+    },
+    {
+      "path": "scripts/decentralized_control_plane/profile_decentralized_control_plane.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ce5a54d1fdf92cbd81d4b1cc8b877fb06776293",
+      "size": 60023,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4ce5a54d1fdf92cbd81d4b1cc8b877fb06776293"
+    },
+    {
+      "path": "scripts/decentralized_scalability",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "07039ce79cb05a62468fde3ed66eafdc9ff1758f",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/07039ce79cb05a62468fde3ed66eafdc9ff1758f"
+    },
+    {
+      "path": "scripts/decentralized_scalability/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "883072cc94424d85922ad5ee03855aafa1fe5eac",
+      "size": 3821,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/883072cc94424d85922ad5ee03855aafa1fe5eac"
+    },
+    {
+      "path": "scripts/decentralized_scalability/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a565d6716f8b1baee677bba039691db2498eb11e",
+      "size": 66,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a565d6716f8b1baee677bba039691db2498eb11e"
+    },
+    {
+      "path": "scripts/decentralized_scalability/common.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cd43c8feb22e46b8249659140750fec98721040d",
+      "size": 9032,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/cd43c8feb22e46b8249659140750fec98721040d"
+    },
+    {
+      "path": "scripts/decentralized_scalability/profile_frontend_ray_cpu.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "78a9a358485985379b3d77315f6b3fcb1ee6d970",
+      "size": 33953,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/78a9a358485985379b3d77315f6b3fcb1ee6d970"
+    },
+    {
+      "path": "scripts/decentralized_scalability/profile_local_scheduler_ray_cpu.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "800a5f0ce83a3cc0503ba33cb7aef62082d1dc84",
+      "size": 27101,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/800a5f0ce83a3cc0503ba33cb7aef62082d1dc84"
+    },
+    {
+      "path": "scripts/decentralized_scalability/profile_router_cpu.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "89e8b6e6dc41fb2944f4585bdad0481e0e5f1692",
+      "size": 12887,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/89e8b6e6dc41fb2944f4585bdad0481e0e5f1692"
+    },
+    {
+      "path": "scripts/decentralized_scalability/run_3node_matrix.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "dd73a22e9106b3f88db0ddb9027c76ca592c047c",
+      "size": 3141,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/dd73a22e9106b3f88db0ddb9027c76ca592c047c"
+    },
+    {
+      "path": "scripts/extract_comm_topology_matrices.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1b6206ed9e7df444636b5f4ff8c1dd4923acbabd",
+      "size": 5612,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1b6206ed9e7df444636b5f4ff8c1dd4923acbabd"
+    },
+    {
+      "path": "scripts/gen_stubs.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "622cd2b9530af03eefdcc494d70d407af43f4815",
+      "size": 151,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/622cd2b9530af03eefdcc494d70d407af43f4815"
+    },
+    {
+      "path": "scripts/issue003",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "720a2a0502bcb7baff2e18955717c2e904179a75",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/720a2a0502bcb7baff2e18955717c2e904179a75"
+    },
+    {
+      "path": "scripts/issue003/bench_serving_overhead.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "50530822f3cd3311d8043f10217a25c4462db342",
+      "size": 24749,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/50530822f3cd3311d8043f10217a25c4462db342"
+    },
+    {
+      "path": "scripts/issue003/run_issue003_deepseek_rate5_sweep.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "762dcc749d3004ef714bab34b9d1a0cdc2125899",
+      "size": 11011,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/762dcc749d3004ef714bab34b9d1a0cdc2125899"
+    },
+    {
+      "path": "scripts/issue003/run_issue003_deepseek_rate5_sweep_0409_linbinbin.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ccfe27fa556cb6e3da204bfd2243468ed155cf2e",
+      "size": 15814,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ccfe27fa556cb6e3da204bfd2243468ed155cf2e"
+    },
+    {
+      "path": "scripts/issue003/run_kimi_issue001_dp16_ep16_deepgemm_1min.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4e071710309b7b9e4580a1088de5789d4ea32a3b",
+      "size": 7855,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4e071710309b7b9e4580a1088de5789d4ea32a3b"
+    },
+    {
+      "path": "scripts/issue003/start_bench.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9dc9968ae73d63930800f498eb125ab885a32406",
+      "size": 16046,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9dc9968ae73d63930800f498eb125ab885a32406"
+    },
+    {
+      "path": "scripts/plot_cp_size_hist_by_iter.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "226712f07b6cd2153aca43a27cac6461bec60cb0",
+      "size": 14086,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/226712f07b6cd2153aca43a27cac6461bec60cb0"
+    },
+    {
+      "path": "scripts/plot_run_metrics.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "87eab4c3b27643bcb5bc56a2dd11cf76847ee6e7",
+      "size": 8708,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/87eab4c3b27643bcb5bc56a2dd11cf76847ee6e7"
+    },
+    {
+      "path": "scripts/plot_step_log_timeseries.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2875094b01e11299aea22a6e4bf008d3ed12e575",
+      "size": 26853,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2875094b01e11299aea22a6e4bf008d3ed12e575"
+    },
+    {
+      "path": "scripts/ray_rpc_overhead",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "30dcd72128a6460d604f9156ff581b4dfbdbefc1",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/30dcd72128a6460d604f9156ff581b4dfbdbefc1"
+    },
+    {
+      "path": "scripts/ray_rpc_overhead/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e1f34b0e70663e64e4a63c7e1fedb35f5ffd480d",
+      "size": 4899,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e1f34b0e70663e64e4a63c7e1fedb35f5ffd480d"
+    },
+    {
+      "path": "scripts/ray_rpc_overhead/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cf39c57c3fa673fba9c14d0dadc45536badfad50",
+      "size": 49,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/cf39c57c3fa673fba9c14d0dadc45536badfad50"
+    },
+    {
+      "path": "scripts/ray_rpc_overhead/profile_ray_rpc_scalability.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4d185f118f265875903832dc8a25295bbe8d2391",
+      "size": 24452,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4d185f118f265875903832dc8a25295bbe8d2391"
+    },
+    {
+      "path": "scripts/ray_rpc_overhead/profile_ray_vs_dlslime.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "82b4e19e16f8ff697ec779bb9d3fc02ccc38d36f",
+      "size": 33847,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/82b4e19e16f8ff697ec779bb9d3fc02ccc38d36f"
+    },
+    {
+      "path": "scripts/reinstall_deepgemm_deepep_aug.zsh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a59567cda1235943f4655ef8e4112005e356a87f",
+      "size": 4350,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a59567cda1235943f4655ef8e4112005e356a87f"
+    },
+    {
+      "path": "scripts/run_2node_r50_uniform_random_compare.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "516dd2303810c46285686e817c8d0175c57f698d",
+      "size": 7595,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/516dd2303810c46285686e817c8d0175c57f698d"
+    },
+    {
+      "path": "scripts/run_2node_rate30_6min_matrix.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "58034bdaf4efeecac7d88f20dddab81afe8a0f95",
+      "size": 8365,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/58034bdaf4efeecac7d88f20dddab81afe8a0f95"
+    },
+    {
+      "path": "scripts/run_2node_rate40_qdiag_ab.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "7a33c41516a06affff6ca2183f5fa49aad12eea6",
+      "size": 7511,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7a33c41516a06affff6ca2183f5fa49aad12eea6"
+    },
+    {
+      "path": "scripts/run_issue001_deepseek_v3_issue001_bucket.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b0e1cd557f23e94ec665a2219ccc407f59c356c",
+      "size": 9271,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4b0e1cd557f23e94ec665a2219ccc407f59c356c"
+    },
+    {
+      "path": "scripts/run_issue003_deepseek_2node_dp16_dp2sp8_chain.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "973d2a7be6a6a7831910cfa2a6fca0e1dd1312fd",
+      "size": 9038,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/973d2a7be6a6a7831910cfa2a6fca0e1dd1312fd"
+    },
+    {
+      "path": "scripts/run_kimi_dp16_ep16_gemm_debug.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "bce96519544e69bada67eeedb134e2339f95d2c3",
+      "size": 4554,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bce96519544e69bada67eeedb134e2339f95d2c3"
+    },
+    {
+      "path": "scripts/scheduler_overhead",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f273a3449ad920af93a86a58ef46d3050d023c4f",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/f273a3449ad920af93a86a58ef46d3050d023c4f"
+    },
+    {
+      "path": "scripts/scheduler_overhead/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf5ab26191283e5665e5fd11ef2383b9da35537b",
+      "size": 10924,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bf5ab26191283e5665e5fd11ef2383b9da35537b"
+    },
+    {
+      "path": "scripts/scheduler_overhead/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0219ff77783d1ba27f16972a44599bb794b8a445",
+      "size": 55,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0219ff77783d1ba27f16972a44599bb794b8a445"
+    },
+    {
+      "path": "scripts/scheduler_overhead/compare_bs128_hosts.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d11b362c19cd99a05caad4d58fee07cf07a47de",
+      "size": 12035,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9d11b362c19cd99a05caad4d58fee07cf07a47de"
+    },
+    {
+      "path": "scripts/scheduler_overhead/profile_bs128_centralized_decentralized.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0b220ea3de36e7b4957bf0260324d2985586011f",
+      "size": 28690,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0b220ea3de36e7b4957bf0260324d2985586011f"
+    },
+    {
+      "path": "scripts/scheduler_overhead/profile_bs128_mixed_admission_decode.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b5ec67eff519b089d3300d31ea4b4d7a941b5b79",
+      "size": 56742,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b5ec67eff519b089d3300d31ea4b4d7a941b5b79"
+    },
+    {
+      "path": "scripts/scheduler_overhead/profile_hierarchical_scheduler_scalability.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7c6c5d67c04466c239a917ad9f532ebf49dbe9e",
+      "size": 42996,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d7c6c5d67c04466c239a917ad9f532ebf49dbe9e"
+    },
+    {
+      "path": "scripts/scheduler_overhead/profile_scheduler_scalability.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6149821bc3a0d88f5e9e1ce99f33bf3947b845a8",
+      "size": 26794,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6149821bc3a0d88f5e9e1ce99f33bf3947b845a8"
+    },
+    {
+      "path": "scripts/sp_ablation",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fa4a9cf453d01f73643d3c36f951b85d67a21825",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/fa4a9cf453d01f73643d3c36f951b85d67a21825"
+    },
+    {
+      "path": "scripts/sp_ablation/bench_serving_overhead.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2873ced1661aad83871ba653267deb95a88b7294",
+      "size": 85445,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2873ced1661aad83871ba653267deb95a88b7294"
+    },
+    {
+      "path": "scripts/sp_ablation/start_bench.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "47015acc7d0549bb92a19e456acc8f02568c0184",
+      "size": 22173,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/47015acc7d0549bb92a19e456acc8f02568c0184"
+    },
+    {
+      "path": "scripts/sp_ablation/sweep_4node_variants.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "17989d610848e3e0f9ef8e30cb580558cad8fe9c",
+      "size": 19969,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/17989d610848e3e0f9ef8e30cb580558cad8fe9c"
+    },
+    {
+      "path": "tests",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "842c4e9dbf5cc9b76e22d971d3a27e48a2f1f4db",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/842c4e9dbf5cc9b76e22d971d3a27e48a2f1f4db"
+    },
+    {
+      "path": "tests/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1cdb31d128ef271e7f83750b1d0c7c185f9448ca",
+      "size": 6514,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/1cdb31d128ef271e7f83750b1d0c7c185f9448ca"
+    },
+    {
+      "path": "tests/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "tests/benchmark_mla_sp_backend.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "77388dcfde6952d3592c28c2862b29ddffdf2f8b",
+      "size": 64152,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/77388dcfde6952d3592c28c2862b29ddffdf2f8b"
+    },
+    {
+      "path": "tests/sp_routing_oracle.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20857900dd8b0f537936aa6b7c1a2364f04be1ce",
+      "size": 3469,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/20857900dd8b0f537936aa6b7c1a2364f04be1ce"
+    },
+    {
+      "path": "tests/test_ae_path_config.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4bbbadbc3582d8121357bc1a1e1d867bf468be24",
+      "size": 7024,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4bbbadbc3582d8121357bc1a1e1d867bf468be24"
+    },
+    {
+      "path": "tests/test_analyze_2node_qdiag_ab.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3322d03bb134f27e00842946066fee1ce17ae5fe",
+      "size": 9242,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3322d03bb134f27e00842946066fee1ce17ae5fe"
+    },
+    {
+      "path": "tests/test_attention_cudagraph.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c6671c61338d711d600f8e9520c07200b7fa573",
+      "size": 25835,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6c6671c61338d711d600f8e9520c07200b7fa573"
+    },
+    {
+      "path": "tests/test_benchmark_sp_graph_metadata_injection_sweep.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "22709e9e6045430ff5d5bf594ac1742e28eb3c7a",
+      "size": 3063,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/22709e9e6045430ff5d5bf594ac1742e28eb3c7a"
+    },
+    {
+      "path": "tests/test_bs128_mixed_admission_decode.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e05090e7ed5068a1f88ae598d6c4629884db0e07",
+      "size": 5513,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e05090e7ed5068a1f88ae598d6c4629884db0e07"
+    },
+    {
+      "path": "tests/test_bs128_scheduler_comparison.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "330f738ef6f8b6ec004d12dc755a420d5cb316ba",
+      "size": 2637,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/330f738ef6f8b6ec004d12dc755a420d5cb316ba"
+    },
+    {
+      "path": "tests/test_decentralized_control_plane_profiler.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed087c6bd5f6f3bd06dfd12e1a51895be7050e1f",
+      "size": 5910,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ed087c6bd5f6f3bd06dfd12e1a51895be7050e1f"
+    },
+    {
+      "path": "tests/test_decentralized_scalability_scripts.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8dc742e5f6bcea923aefe34c04550eb1ea9ed24",
+      "size": 6552,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a8dc742e5f6bcea923aefe34c04550eb1ea9ed24"
+    },
+    {
+      "path": "tests/test_decode_a2a_mask_logging.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9265f1673d2b4237fee232dad8114c6325bb5eea",
+      "size": 2133,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9265f1673d2b4237fee232dad8114c6325bb5eea"
+    },
+    {
+      "path": "tests/test_decode_backend_compat.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "147557532d6fec052dd1667f541212fb1237d02e",
+      "size": 10169,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/147557532d6fec052dd1667f541212fb1237d02e"
+    },
+    {
+      "path": "tests/test_decode_rpc_optimization.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d3163567a0ed7634ff7b9b3a1eca9191b8b03c1",
+      "size": 7042,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9d3163567a0ed7634ff7b9b3a1eca9191b8b03c1"
+    },
+    {
+      "path": "tests/test_deepseek_mla_prefill.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d8cec06513b2c5b3eb2eba525c94ffdb83f665b2",
+      "size": 3574,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d8cec06513b2c5b3eb2eba525c94ffdb83f665b2"
+    },
+    {
+      "path": "tests/test_deepseek_moe_routing.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cbb5184a733e4aee99d4417b15cf4eb635116ecf",
+      "size": 7165,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/cbb5184a733e4aee99d4417b15cf4eb635116ecf"
+    },
+    {
+      "path": "tests/test_dlslime_fixed_sp_batch_correctness.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "17a811afa685e2ea44fab0b908e1df1c2e450cba",
+      "size": 9336,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/17a811afa685e2ea44fab0b908e1df1c2e450cba"
+    },
+    {
+      "path": "tests/test_ep_context.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "51dadab1e67ac430c59c77cc5dd829449a7a0fe4",
+      "size": 9761,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/51dadab1e67ac430c59c77cc5dd829449a7a0fe4"
+    },
+    {
+      "path": "tests/test_fa.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "699b9af4160f6695480f4a5507184156814df9e5",
+      "size": 3636,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/699b9af4160f6695480f4a5507184156814df9e5"
+    },
+    {
+      "path": "tests/test_flash_mla_decode_metadata.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e7b81b1baeaf16dc5d3f2e51e64b4b7d1e21b6a",
+      "size": 3874,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8e7b81b1baeaf16dc5d3f2e51e64b4b7d1e21b6a"
+    },
+    {
+      "path": "tests/test_flash_mla_prefill.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4c7321a941465b102d617432152c5a6e7c0d79f7",
+      "size": 6171,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4c7321a941465b102d617432152c5a6e7c0d79f7"
+    },
+    {
+      "path": "tests/test_flash_mla_prefill_numerics.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7e6cdefd69bbb2aab5bd4289337447111b355e4a",
+      "size": 2155,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7e6cdefd69bbb2aab5bd4289337447111b355e4a"
+    },
+    {
+      "path": "tests/test_frontend_transport.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b558db9c7ef723c0b689a0648025bbd055108232",
+      "size": 9858,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b558db9c7ef723c0b689a0648025bbd055108232"
+    },
+    {
+      "path": "tests/test_hao_dynamic_sp_q_routing.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b5545aa42e4603c0c9ec50027948408249c02bd6",
+      "size": 10121,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b5545aa42e4603c0c9ec50027948408249c02bd6"
+    },
+    {
+      "path": "tests/test_hierarchical_contract.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28e291534a90e16ea1e32e94fe8e580e98528411",
+      "size": 37042,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/28e291534a90e16ea1e32e94fe8e580e98528411"
+    },
+    {
+      "path": "tests/test_hierarchical_control_plane.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0bcd6ea0a3c5d483185b4afaaf362c0f018ec289",
+      "size": 85066,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/0bcd6ea0a3c5d483185b4afaaf362c0f018ec289"
+    },
+    {
+      "path": "tests/test_hierarchical_scheduler_overhead_profiler.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d8c517adb5a4820be58c3ce6aa6f285bcedc625",
+      "size": 5003,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9d8c517adb5a4820be58c3ce6aa6f285bcedc625"
+    },
+    {
+      "path": "tests/test_hierarchical_serving_ingress.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6177f2c3838e424f34b10a1ed86df2bdbe1a5024",
+      "size": 34012,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6177f2c3838e424f34b10a1ed86df2bdbe1a5024"
+    },
+    {
+      "path": "tests/test_kv_migration_layout.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c25acc5c4235fff74e11ace0fc44c8234279a98",
+      "size": 3847,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/6c25acc5c4235fff74e11ace0fc44c8234279a98"
+    },
+    {
+      "path": "tests/test_layernorm_noncontiguous.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b957a395b7665891631dff0075885d27989ffc73",
+      "size": 557,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b957a395b7665891631dff0075885d27989ffc73"
+    },
+    {
+      "path": "tests/test_least_batch_cpu_benchmark.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70364df0d45e749fb012e8840ebe4bda192d18f6",
+      "size": 2954,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/70364df0d45e749fb012e8840ebe4bda192d18f6"
+    },
+    {
+      "path": "tests/test_least_batch_staged_admission.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3fd074190890cc3ec4d4812c66214c709156f9b6",
+      "size": 13460,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/3fd074190890cc3ec4d4812c66214c709156f9b6"
+    },
+    {
+      "path": "tests/test_legacy_quantum_diagnostics.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35007a0a7644627d63167839306fa0618b104f56",
+      "size": 4199,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/35007a0a7644627d63167839306fa0618b104f56"
+    },
+    {
+      "path": "tests/test_local_executor_result_path.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "579a3ad699384894831986c8a84cf0fc41445e76",
+      "size": 2816,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/579a3ad699384894831986c8a84cf0fc41445e76"
+    },
+    {
+      "path": "tests/test_logging_config.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a633c82a52ee1d5812434698ba53c3ac53bd82c9",
+      "size": 436,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a633c82a52ee1d5812434698ba53c3ac53bd82c9"
+    },
+    {
+      "path": "tests/test_mla_sp_backend_correctness.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8083dd152b4bd9dc265e175793663e46d4c2e647",
+      "size": 24629,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/8083dd152b4bd9dc265e175793663e46d4c2e647"
+    },
+    {
+      "path": "tests/test_moe_routing_simulation.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cdab6416fe20308c203609bbe867f48afced93dd",
+      "size": 1593,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/cdab6416fe20308c203609bbe867f48afced93dd"
+    },
+    {
+      "path": "tests/test_native_moe_backend.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "883f5b268ff80ce1140556f472d7479f8d7a9056",
+      "size": 8082,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/883f5b268ff80ce1140556f472d7479f8d7a9056"
+    },
+    {
+      "path": "tests/test_pd_decode_sp_batch_semantics.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "41cb0d4218048e3c61999b38fbd2ce5e3179e1fc",
+      "size": 19163,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/41cb0d4218048e3c61999b38fbd2ce5e3179e1fc"
+    },
+    {
+      "path": "tests/test_pd_decode_sp_bucket_semantics.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb8bb3cc9c94e9e23b7139d4115019f5df1177f9",
+      "size": 4331,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/eb8bb3cc9c94e9e23b7139d4115019f5df1177f9"
+    },
+    {
+      "path": "tests/test_pd_long_prompt_text.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d81c589087f05ade607ed535bad1ab7dcce10767",
+      "size": 1383,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/d81c589087f05ade607ed535bad1ab7dcce10767"
+    },
+    {
+      "path": "tests/test_pd_serving_benchmark.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "704ef0421ecbfa289b638946d604a80badfc70d7",
+      "size": 6105,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/704ef0421ecbfa289b638946d604a80badfc70d7"
+    },
+    {
+      "path": "tests/test_prefill_dummy_metadata.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "73633b329849bd885ab981a311e6796e12f20fe3",
+      "size": 4158,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/73633b329849bd885ab981a311e6796e12f20fe3"
+    },
+    {
+      "path": "tests/test_prefill_logits_selection.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e52ec9c4483317e158b5aa0218f586012cb74d4",
+      "size": 2010,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/9e52ec9c4483317e158b5aa0218f586012cb74d4"
+    },
+    {
+      "path": "tests/test_rate40_qdiag_ab_runner.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "57988f70ba3b428da9435c349a3d8332931ac9c2",
+      "size": 1801,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/57988f70ba3b428da9435c349a3d8332931ac9c2"
+    },
+    {
+      "path": "tests/test_ray_executor_quantum_diagnostics.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70f76706391f7e0877940038c502ae49120b1e1a",
+      "size": 3619,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/70f76706391f7e0877940038c502ae49120b1e1a"
+    },
+    {
+      "path": "tests/test_ray_rpc_overhead_profiler.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5bbe568e411e27adf758f6888f660092e327e5ec",
+      "size": 5716,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5bbe568e411e27adf758f6888f660092e327e5ec"
+    },
+    {
+      "path": "tests/test_ray_vs_dlslime_profiler.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "56df04ca37de39f0323bdf012cba1d5be8b48711",
+      "size": 6056,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/56df04ca37de39f0323bdf012cba1d5be8b48711"
+    },
+    {
+      "path": "tests/test_rotary_embedding.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc8cdf6920a5d10191506c154b58f835f1993d43",
+      "size": 2925,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bc8cdf6920a5d10191506c154b58f835f1993d43"
+    },
+    {
+      "path": "tests/test_routing_config.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec2459cffbd5a1d6f1a34a7bcdd5397ddb43f010",
+      "size": 8323,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/ec2459cffbd5a1d6f1a34a7bcdd5397ddb43f010"
+    },
+    {
+      "path": "tests/test_scheduler_overhead_profiler.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4e3b494f0cb4132eda2f60a748ba24fe27f583d4",
+      "size": 3125,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/4e3b494f0cb4132eda2f60a748ba24fe27f583d4"
+    },
+    {
+      "path": "tests/test_sequence_proxy.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a1f4e1e73ad17fe884657fbc658e77ec89ce181c",
+      "size": 1654,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a1f4e1e73ad17fe884657fbc658e77ec89ce181c"
+    },
+    {
+      "path": "tests/test_sp_ablation_launcher.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a4dd495c89f8c8ea34682af1a27e444847aa1090",
+      "size": 1688,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/a4dd495c89f8c8ea34682af1a27e444847aa1090"
+    },
+    {
+      "path": "tests/test_sp_attention_cudagraph.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7189be326e1654050a67cf97589b0d7a4e3d27d6",
+      "size": 64189,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/7189be326e1654050a67cf97589b0d7a4e3d27d6"
+    },
+    {
+      "path": "tests/test_sp_backend.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93907f7cfd55784a81879879666f77e83156a78d",
+      "size": 18770,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/93907f7cfd55784a81879879666f77e83156a78d"
+    },
+    {
+      "path": "tests/test_sp_graph_runtime_overhead.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e34699e163e947afcb8d597992497d3b75b9cfac",
+      "size": 11256,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/e34699e163e947afcb8d597992497d3b75b9cfac"
+    },
+    {
+      "path": "tests/test_uniform_random_compare_runner.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24be69377f7ca3a4e4e95eea437fe936342f7e16",
+      "size": 5432,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/24be69377f7ca3a4e4e95eea437fe936342f7e16"
+    },
+    {
+      "path": "tests/test_weight_loader.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b61326a77c5749e35cef3865ab4a8ce4f775e502",
+      "size": 9399,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b61326a77c5749e35cef3865ab4a8ce4f775e502"
+    },
+    {
+      "path": "tests/test_worker_transport.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5ceb2f9704cb4cf19ce28bc8a9ee4e79aa33001d",
+      "size": 11205,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/5ceb2f9704cb4cf19ce28bc8a9ee4e79aa33001d"
+    },
+    {
+      "path": "utils_analysis",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6dba34fbc04e59d10970f8d01e4e85037d873e9c",
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/trees/6dba34fbc04e59d10970f8d01e4e85037d873e9c"
+    },
+    {
+      "path": "utils_analysis/analyze_2node_qdiag_ab.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "316fb4e3a595c47b7aa11a1ddee2d87156120ae2",
+      "size": 25818,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/316fb4e3a595c47b7aa11a1ddee2d87156120ae2"
+    },
+    {
+      "path": "utils_analysis/analyze_csv_dataset.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b500b14c0e789ceaf33fe5fb37282ade70462c8d",
+      "size": 15515,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/b500b14c0e789ceaf33fe5fb37282ade70462c8d"
+    },
+    {
+      "path": "utils_analysis/analyze_sp_graph_runtime_trace.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2218cd3629b156afc5048c734c917de1bf0d1939",
+      "size": 6275,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/2218cd3629b156afc5048c734c917de1bf0d1939"
+    },
+    {
+      "path": "utils_analysis/itl_stat.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "69dd3cf687efeffd3d99abbce57a239eeb6ec95a",
+      "size": 6931,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/69dd3cf687efeffd3d99abbce57a239eeb6ec95a"
+    },
+    {
+      "path": "utils_analysis/plot_bench_log.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "161667b7f83f54cbf5f10b1f9464fc632ffba5b4",
+      "size": 23796,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/161667b7f83f54cbf5f10b1f9464fc632ffba5b4"
+    },
+    {
+      "path": "utils_analysis/plot_metric_with_rate.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf73c6ceef965d1c80513ae0a9494f911a989d62",
+      "size": 8766,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/bf73c6ceef965d1c80513ae0a9494f911a989d62"
+    },
+    {
+      "path": "utils_analysis/plot_mla_sp_backend_csv.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "235ca7529c7cfd99281f863a250bfd9ffc108d61",
+      "size": 11553,
+      "url": "https://api.github.com/repos/nano-infra/NanoEngine/git/blobs/235ca7529c7cfd99281f863a250bfd9ffc108d61"
+    }
+  ],
+  "truncated": false
+}
