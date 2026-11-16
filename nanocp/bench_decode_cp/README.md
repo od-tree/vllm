@@ -11,7 +11,7 @@ through the already installed `varlen_fwd`, with head-TP arguments left off
 | `merge_cp.py` | Online combine from `[W, B, H, *]`. A rank with `context_lens <= 0` is skipped. Writes O only |
 | `copy_idx.py` | Indexed copies that stage partial O and LSE before the return all-to-all |
 | `hao_basic.py` | DLSlime Basic all-to-all: one kernel, int4 warp copy, flag handshake inside it |
-| `cuda_ipc_p2p.py` | Optional CUDA IPC peer mapping for 5090 (`P2P_BACKEND=auto\|ipc\|peer`) |
+| `cuda_ipc_p2p.py` | 5090 transport is `cudaMemcpyPeer` (`P2P_BACKEND=auto\|memcpy\|peer`) |
 | `comm_cp.py` | N-rank Q / O / LSE route. Mask or `dst_row_indices`, preallocated `[src, slot]` buffers. KV is not moved |
 | `decode_cp.py` | `run_routed` for any rank count. `merge_halves` is the one-GPU check |
 | `reference.py` | Single-card full-length FA2 |
@@ -31,10 +31,9 @@ python3 test_e2e_correctness.py
 python3 bench_perf.py
 ```
 
-Peer backend: default ``P2P_BACKEND=auto`` keeps the historical
-``EnablePeerAccess`` + foreign ``data_ptr`` path, and switches to CUDA IPC
-pointer tables on sm_120 / RTX 5090. Force with ``P2P_BACKEND=ipc`` or
-``P2P_BACKEND=peer``.
+Peer backend: default ``P2P_BACKEND=auto`` keeps kernel stores through a
+foreign ``data_ptr`` on older GPUs, and uses ``cudaMemcpyPeer`` on sm_120 /
+RTX 5090. Force with ``P2P_BACKEND=memcpy`` or ``P2P_BACKEND=peer``.
 
 Output gate versus a single-card full FA2 is max abs `1e-2` on bf16, including
 short rows. The combine kernel matches NanoCP and does not return a merged
