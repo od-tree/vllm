@@ -77,10 +77,7 @@ def _stage_return(comm, rank: int, slots: torch.Tensor, out: torch.Tensor,
     lse_in = torch.empty(world * comm_bs, lse.shape[1], lse.shape[2], dtype=lse.dtype, device=device)
     copy_batch_indexed_triton(out, o_in, src_idx, dst_in, ones)
     copy_batch_indexed_triton(lse, lse_in, src_idx, dst_in, ones)
-    return [
-        comm.launch_return("o", rank, o_in, mask, sync=False),
-        comm.launch_return("lse", rank, lse_in, mask, sync=False),
-    ]
+    return o_in, lse_in, mask
 
 
 def _select_segment(segment: SegmentBatch, slots: torch.Tensor, full_batch: int) -> tuple:
