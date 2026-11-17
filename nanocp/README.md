@@ -32,7 +32,8 @@ aligning the operator. The bench does not import it.
 ## Peer backend (5090)
 
 `bench_decode_cp/cuda_ipc_p2p.py` keeps the historical
-`EnablePeerAccess` + foreign `data_ptr` path. `P2P_BACKEND=auto` (default)
-uses `cudaMemcpyPeer` on sm_120 / RTX 5090. Force with `memcpy` or `peer`.
-The head-TP GPU test uses the same switch: the kernel writes a local
-payload, then the host copies it.
+`EnablePeerAccess` + foreign `data_ptr` path, and adds CUDA IPC pointer
+tables for kernel stores. `P2P_BACKEND=auto` (default) selects IPC on
+sm_120 / RTX 5090; force with `ipc` or `peer`. The same helper is used by
+the head-TP GPU test under
+`vllm/local_research/vendor/flash-attention/tests/`.

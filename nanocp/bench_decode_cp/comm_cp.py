@@ -35,8 +35,8 @@ def as_device(device) -> torch.device:
 def enable_peers(devices):
     """Enable peer access for every CUDA pair in ``devices``. One device is a no-op.
 
-    Backend is selected by ``P2P_BACKEND`` (``peer`` / ``memcpy`` / ``ipc`` / ``auto``).
-    ``auto`` uses ``cudaMemcpyPeer`` on sm_120 / 5090; see ``cuda_ipc_p2p.py``.
+    Backend is selected by ``P2P_BACKEND`` (``peer`` / ``ipc`` / ``auto``).
+    ``auto`` picks CUDA IPC on sm_120 / 5090; see ``cuda_ipc_p2p.py``.
     """
     from cuda_ipc_p2p import enable_peers as _enable_peers
 
@@ -151,14 +151,20 @@ class CpComm:
             for name, shape in self.shapes.items()
         }
         self._ipc = None
-        self._memcpy = False
         cuda_ids = [device.index for device in self.devices if device.type == "cuda"]
         if len(set(cuda_ids)) > 1:
-            from cuda_ipc_p2p import use_memcpy
+            from cuda_ipc_p2p import IpcPeerMesh, use_ipc
 
-            self._memcpy = use_memcpy()
-        if not self._memcpy:
-            self._prepare_tables()
+            if use_ipc():
+                self._ipc = IpcPeerMesh(sorted(set(cuda_ids)))
+                for name in self.shapes:
+                    for tensor in self.buffers[name]:
+                        self._ipc.export(tensor)
+                    for tensor in self.arrived[name]:
+                        self._ipc.export(tensor)
+                    for tensor in self.staging[name]:
+                        self._ipc.export(tensor)
+        self._prepare_tables()
 
     def _prepare_tables(self) -> None:
         """Pointer tables have to exist before a rank spins on the peer flag.
@@ -202,10 +208,8 @@ class CpComm:
                 "q", src, q, transfers, mask, dst_row_indices, None, is_transpose=False,
             )
             # Only the MoE rank has Q. The other ranks still have to enter the
-            # kernel, or the handshake never finishes. cudaMemcpyPeer does not
-            # spin, so those ranks have nothing to enter.
-            if not self._memcpy:
-                self._participate_others("q", src)
+            # kernel, or the handshake never finishes.
+            self._participate_others("q", src)
             if sync:
                 self._sync_cuda()
             return launch
@@ -233,8 +237,7 @@ class CpComm:
             launch = self._device_launch(
                 channel, src, value, transfers, mask, None, slots, is_transpose=False,
             )
-            if not self._memcpy:
-                self._participate_others(channel, src)
+            self._participate_others(channel, src)
             if sync:
                 self._sync_cuda()
             return launch
@@ -375,7 +378,7 @@ class CpComm:
         when the handshake is on, or the ranks that do send never leave it.
         One GPU does not handshake, so this is a no-op there.
         """
-        if self._memcpy or not self._cross_device() or self.devices[rank].type != "cuda":
+        if not self._cross_device() or self.devices[rank].type != "cuda":
             return
         from hao_basic import hao_launch
 
@@ -447,6 +450,8 @@ class CpComm:
     def _device_launch(self, channel: str, src: int, value: torch.Tensor, transfers: list[Transfer],
                        mask: torch.Tensor | None, dst_row_indices: torch.Tensor | None,
                        slots: torch.Tensor | None, is_transpose: bool = False) -> RouteLaunch:
+        from hao_basic import hao_launch
+
         self._check_tail(channel, value)
         self.epoch[channel] += 1
         epoch = self.epoch[channel]
@@ -454,11 +459,6 @@ class CpComm:
             channel, transfers, src=src, epoch=epoch,
             written={transfer.dst for transfer in transfers},
         )
-        if self._memcpy:
-            self._memcpy_rows(channel, src, value, mask, dst_row_indices, slots, is_transpose)
-            return launch
-        from hao_basic import hao_launch
-
         if slots is not None:
             dst_row_indices = self._mask_slots_to_rows(src, mask, slots)
             mask = None
@@ -473,45 +473,6 @@ class CpComm:
             cache=self._gpu_tables, handshake=self._cross_device(), mesh=self._ipc,
         ))
         return launch
-
-    def _memcpy_rows(self, channel: str, src: int, value: torch.Tensor,
-                     mask: torch.Tensor | None, dst_row_indices: torch.Tensor | None,
-                     slots: torch.Tensor | None, is_transpose: bool) -> None:
-        """Place one rank's rows with ``cudaMemcpyPeer``. No device handshake.
-
-        The destination layout matches the Basic kernel: non-transpose writes
-        ``buffer[src, slot]`` on each destination, and a transpose send reads
-        ``packed[dst, row]`` into ``buffer[src, row]``.
-        """
-        from cuda_ipc_p2p import memcpy_peer
-
-        if not value.is_contiguous():
-            value = value.contiguous()
-        batch = mask.shape[1] if is_transpose else value.shape[0]
-        if slots is not None:
-            slots = _cpu_long(slots)
-            if slots.numel() != batch:
-                raise ValueError(f"memcpy slots {slots.numel()} != rows {batch}")
-        for dst in range(self.world):
-            buf = self.buffers[channel][dst]
-            for token in range(batch):
-                if is_transpose:
-                    if mask is not None and int(mask[dst, token]) == 0:
-                        continue
-                    row = value[dst * batch + token]
-                    memcpy_peer(buf[src, token], row)
-                    continue
-                if dst_row_indices is not None:
-                    slot = int(dst_row_indices[dst, token])
-                    if slot < 0:
-                        continue
-                elif mask is not None:
-                    if int(mask[dst, token]) == 0:
-                        continue
-                    slot = int(slots[token]) if slots is not None else token
-                else:
-                    slot = token
-                memcpy_peer(buf[src, slot], value[token])
 
     def _put(self, channel: str, value: torch.Tensor, transfer: Transfer):
         """CPU placement. CUDA goes through the Basic kernel."""
