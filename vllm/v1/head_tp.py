@@ -240,6 +240,28 @@ def _active_shard(step: HeadTPStep | None, req_id: str, rank: int) -> HeadTPShar
     raise ValueError(f"{req_id} is an active head-TP request but rank {rank} has no shard")
 
 
+def _splits_for_full_waves(long_heads: int, num_sms: int, cap: int) -> int:
+    """How many times to split each long head once the SMs are already full.
+
+    One split leaves a partial last wave that still scans the whole segment.
+    The result minimizes ``ceil(long_heads * splits / num_sms) / splits``,
+    the scan time in units of one full segment. A tie keeps the smaller
+    split so the combine loop stays short.
+    """
+
+    if long_heads <= 0 or num_sms <= 0:
+        return 1
+    cap = max(1, cap)
+    best_splits = 1
+    best_waves = (long_heads + num_sms - 1) // num_sms
+    for splits in range(2, cap + 1):
+        waves = (long_heads * splits + num_sms - 1) // num_sms
+        if waves * best_splits < best_waves * splits:
+            best_splits = splits
+            best_waves = waves
+    return best_splits
+
+
 def build_head_tp_tile_plan(
     seq_lens: list[int],
     req_ids: list[str],
@@ -252,9 +274,11 @@ def build_head_tp_tile_plan(
 ) -> tuple[list[int], list[int], int]:
     """CTA list for one decode step. Long rows are first and split by length.
 
-    Short rows and inactive plans get one CTA per KV head. Long rows share
-    about ``num_sms`` CTAs when that is more than one CTA per long head.
-    Each row is capped at ``split_cap`` and at the number of FA2 KV tiles
+    Short rows and inactive plans get one CTA per KV head. While the long
+    heads do not fill the SMs, those rows share about ``num_sms`` CTAs.
+    Once they already fill the SMs, each long head is split again so the
+    partial last wave scans a shorter piece. Each row is capped at
+    ``split_cap`` and at the number of FA2 KV tiles
     (``ceil(seq / kv_block_tokens)``), so a short long-row does not launch
     empty splits. The result is host data; the caller uploads it once and
     every layer of this step reads the same copy.
@@ -286,6 +310,15 @@ def build_head_tp_tile_plan(
             raw = (num_sms * seq) // (total * heads)
             n_blocks = max(1, (seq + kv_block_tokens - 1) // kv_block_tokens)
             row_splits[index] = min(split_cap, n_blocks, max(1, raw))
+    elif long_rows:
+        max_seq = max(max(seq_lens[index], 1) for index, _ in long_rows)
+        max_blocks = max(1, (max_seq + kv_block_tokens - 1) // kv_block_tokens)
+        chosen = _splits_for_full_waves(long_heads, num_sms, min(split_cap, max_blocks))
+        for index, _shard in long_rows:
+            seq = max(seq_lens[index], 1)
+            n_blocks = max(1, (seq + kv_block_tokens - 1) // kv_block_tokens)
+            raw = max(1, chosen * seq // max_seq)
+            row_splits[index] = min(split_cap, n_blocks, raw)
     tiles: list[int] = []
     for index, shard in long_rows:
         for split in range(row_splits[index]):

@@ -65,23 +65,40 @@ def test_partner_rank_uses_its_own_kv_head():
     assert [_unpack(tile)[1] for tile in tiles] == [1] * 16
 
 
-def test_saturated_long_batch_stays_at_one_split():
+def _saturated(n: int):
     plans = {
         f"r{i}": make_plan(
             f"r{i}", 16, 2, 2, 0, 2,
             state="active", kv_source="gpu_copy",
             visible_len=32768, predicted_remaining=0,
         )
-        for i in range(256)
+        for i in range(n)
     }
-    tiles, splits, max_splits = build_head_tp_tile_plan(
-        [32768] * 256, list(plans), HeadTPStep(plans=plans, active=True),
+    return build_head_tp_tile_plan(
+        [32768] * n, list(plans), HeadTPStep(plans=plans, active=True),
         rank=0, num_kv_heads=2, num_sms=108,
     )
-    assert splits == [1] * 256
-    assert max_splits == 1
-    assert len(tiles) == 256
+
+
+def test_saturated_long_batch_splits_to_shorten_the_tail():
+    # 128 heads: ceil(128 * s / 108) / s is smallest at s=16 (1.1875 vs 2).
+    # 256 heads: smallest at s=8 (2.375 vs 3). An exact multiple of 108 stays
+    # at one split, because another split does not remove a partial wave.
+    tiles, splits, max_splits = _saturated(128)
+    assert splits == [16] * 128
+    assert max_splits == 16
+    assert len(tiles) == 128 * 16
     assert {_unpack(tile)[1] for tile in tiles} == {0}
+
+    tiles, splits, max_splits = _saturated(256)
+    assert splits == [8] * 256
+    assert max_splits == 8
+    assert len(tiles) == 256 * 8
+
+    tiles, splits, max_splits = _saturated(108)
+    assert splits == [1] * 108
+    assert max_splits == 1
+    assert len(tiles) == 108
 
 
 def test_splits_stop_at_kv_blocks():
