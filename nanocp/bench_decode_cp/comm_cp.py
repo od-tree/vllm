@@ -19,6 +19,7 @@ built, and the device copy of a mask is kept after the first step.
 
 from __future__ import annotations
 
+import ctypes
 from dataclasses import dataclass, field
 
 import torch
@@ -33,14 +34,44 @@ def as_device(device) -> torch.device:
 
 
 def enable_peers(devices):
-    """Enable peer access for every CUDA pair in ``devices``. One device is a no-op.
-
-    Backend is selected by ``P2P_BACKEND`` (``peer`` / ``ipc`` / ``auto``).
-    ``auto`` picks CUDA IPC on sm_120 / 5090; see ``cuda_ipc_p2p.py``.
-    """
-    from cuda_ipc_p2p import enable_peers as _enable_peers
-
-    return _enable_peers(devices)
+    """Enable peer access for every CUDA pair in ``devices``. One device is a no-op."""
+    cuda_ids = []
+    for device in devices:
+        resolved = as_device(device)
+        if resolved.type == "cuda":
+            cuda_ids.append(resolved.index)
+    if len(set(cuda_ids)) != len(cuda_ids):
+        raise ValueError(f"duplicate CUDA devices in {cuda_ids}")
+    if len(cuda_ids) < 2:
+        return
+    for src in cuda_ids:
+        for dst in cuda_ids:
+            if src != dst and not torch.cuda.can_device_access_peer(src, dst):
+                raise SystemExit(f"cuda peer access {src}->{dst} is not available")
+    lib = None
+    for soname in ("libcudart.so", "libcudart.so.13", "libcudart.so.12"):
+        try:
+            lib = ctypes.CDLL(soname)
+            break
+        except OSError:
+            continue
+    if lib is None:
+        raise SystemExit("libcudart was not found")
+    lib.cudaSetDevice.argtypes = [ctypes.c_int]
+    lib.cudaSetDevice.restype = ctypes.c_int
+    lib.cudaDeviceEnablePeerAccess.argtypes = [ctypes.c_int, ctypes.c_uint]
+    lib.cudaDeviceEnablePeerAccess.restype = ctypes.c_int
+    for src in cuda_ids:
+        err = lib.cudaSetDevice(src)
+        if err != 0:
+            raise SystemExit(f"cudaSetDevice({src}) returned {err}")
+        for dst in cuda_ids:
+            if src == dst:
+                continue
+            err = lib.cudaDeviceEnablePeerAccess(dst, 0)
+            if err not in (0, 704):
+                raise SystemExit(f"peer access {src}->{dst} returned {err}")
+    torch.cuda.set_device(cuda_ids[0])
 
 
 def mask_from_kv_ranks(world: int, kv_ranks: list[list[int]]) -> torch.Tensor:
@@ -150,20 +181,6 @@ class CpComm:
             ]
             for name, shape in self.shapes.items()
         }
-        self._ipc = None
-        cuda_ids = [device.index for device in self.devices if device.type == "cuda"]
-        if len(set(cuda_ids)) > 1:
-            from cuda_ipc_p2p import IpcPeerMesh, use_ipc
-
-            if use_ipc():
-                self._ipc = IpcPeerMesh(sorted(set(cuda_ids)))
-                for name in self.shapes:
-                    for tensor in self.buffers[name]:
-                        self._ipc.export(tensor)
-                    for tensor in self.arrived[name]:
-                        self._ipc.export(tensor)
-                    for tensor in self.staging[name]:
-                        self._ipc.export(tensor)
         self._prepare_tables()
 
     def _prepare_tables(self) -> None:
@@ -178,10 +195,7 @@ class CpComm:
 
         for name in self.shapes:
             for device in self.devices:
-                prepare_tables(
-                    self.buffers[name], self.arrived[name], self._gpu_tables, device,
-                    mesh=self._ipc,
-                )
+                prepare_tables(self.buffers[name], self.arrived[name], self._gpu_tables, device)
 
     def launch_q(self, src: int, q: torch.Tensor, mask: torch.Tensor | None = None,
                  dst_row_indices: torch.Tensor | None = None, sync: bool = True) -> RouteLaunch:
@@ -388,7 +402,7 @@ class CpComm:
             self._dummy(channel, device), self.buffers[channel], self.arrived[channel],
             self.semaphore[channel][rank], rank=rank, world=self.world, batch_size=0,
             max_batch=self.max_batch, is_transpose=False, mask=None, dst_row_indices=None,
-            cache=self._gpu_tables, handshake=True, mesh=self._ipc,
+            cache=self._gpu_tables, handshake=True,
         )
 
     def _participate_others(self, channel: str, src: int) -> None:
@@ -470,7 +484,7 @@ class CpComm:
             value, self.buffers[channel], self.arrived[channel], self.semaphore[channel][src],
             rank=src, world=self.world, batch_size=rows, max_batch=self.max_batch,
             is_transpose=is_transpose, mask=mask, dst_row_indices=dst_row_indices,
-            cache=self._gpu_tables, handshake=self._cross_device(), mesh=self._ipc,
+            cache=self._gpu_tables, handshake=self._cross_device(),
         ))
         return launch
 

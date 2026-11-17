@@ -307,30 +307,18 @@ def _empty_i32(cache: dict, device: torch.device) -> torch.Tensor:
     return hit
 
 
-def _ptrs(cache: dict, tensors: list[torch.Tensor], device: torch.device,
-          mesh=None) -> torch.Tensor:
+def _ptrs(cache: dict, tensors: list[torch.Tensor], device: torch.device) -> torch.Tensor:
     """Device pointer table. Built once, with a stream-ordered copy.
 
     ``torch.tensor(..., device=cuda)`` copies through a synchronizing
     memcpy. The next channel's table would then wait for the kernel that
     is already spinning on the peer flag, and that peer has not launched.
-
-    When ``mesh`` is an ``IpcPeerMesh``, foreign buffers are opened on
-    ``device`` and the table stores those writer-local addresses.
     """
-    writer = int(device.index) if device.type == "cuda" else -1
-    raw_ptrs = tuple(int(t.data_ptr()) for t in tensors)
-    key = ("ptrs", writer, raw_ptrs, mesh is not None)
+    key = ("ptrs", tuple(int(t.data_ptr()) for t in tensors), device.index)
     hit = cache.get(key)
     if hit is not None:
         return hit
-    if mesh is not None and device.type == "cuda":
-        host = torch.tensor(
-            [mesh.writer_ptr(tensor, writer) for tensor in tensors],
-            dtype=torch.int64,
-        )
-    else:
-        host = torch.tensor(list(raw_ptrs), dtype=torch.int64)
+    host = torch.tensor([t.data_ptr() for t in tensors], dtype=torch.int64)
     if device.type == "cuda":
         host = host.pin_memory()
         table = torch.empty(host.shape, dtype=torch.int64, device=device)
@@ -343,13 +331,13 @@ def _ptrs(cache: dict, tensors: list[torch.Tensor], device: torch.device,
 
 
 def prepare_tables(buffers: list[torch.Tensor], flags: list[torch.Tensor],
-                   cache: dict, device: torch.device, mesh=None) -> None:
+                   cache: dict, device: torch.device) -> None:
     """Upload pointer tables before any rank enters the handshake."""
     if device.type != "cuda":
         return
     torch.cuda.set_device(device)
-    _ptrs(cache, buffers, device, mesh=mesh)
-    _ptrs(cache, flags, device, mesh=mesh)
+    _ptrs(cache, buffers, device)
+    _ptrs(cache, flags, device)
     _empty_i32(cache, device)
     torch.cuda.current_stream(device).synchronize()
 
@@ -368,7 +356,6 @@ def hao_launch(
     dst_row_indices: torch.Tensor | None,
     cache: dict,
     handshake: bool,
-    mesh=None,
 ) -> list[torch.Tensor]:
     """Queue one rank's Basic all-to-all on the current stream.
 
@@ -417,8 +404,8 @@ def hao_launch(
     empty = _empty_i32(cache, device)
     mask_gpu = _resident(cache, mask, device) if mask is not None else empty
     rows_gpu = _resident(cache, dst_row_indices, device) if dst_row_indices is not None else empty
-    dst_ptrs = _ptrs(cache, dst_buffers, device, mesh=mesh)
-    flag_ptrs = _ptrs(cache, flag_tensors, device, mesh=mesh)
+    dst_ptrs = _ptrs(cache, dst_buffers, device)
+    flag_ptrs = _ptrs(cache, flag_tensors, device)
     _ext().hao_basic_launch(
         flat, dst_ptrs, flag_ptrs, semaphore,
         int(rank), int(world), int(batch_size), int(max_batch), int(flat.shape[1]),
