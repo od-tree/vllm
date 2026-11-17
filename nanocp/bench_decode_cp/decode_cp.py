@@ -181,10 +181,24 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
         torch.cuda.set_device(moe_device)
     batch, heads, dim = q.shape
     lens = torch.zeros(world, batch, dtype=torch.int32, device=moe_device)
+    # The route slots are a CPU index. A pageable H2D copy cannot be captured,
+    # and the graph would keep the address of a tensor that dies with this call.
+    # The upload is cached on the comm object; a replay reads that GPU index.
+    slot_cache = getattr(comm, "_lens_slots", None)
+    if slot_cache is None:
+        slot_cache = {}
+        comm._lens_slots = slot_cache
     for rank, slots, _out, _lse in produced:
-        lens[rank].index_copy_(
-            0, slots.to(moe_device), segments[rank].seqused.to(device=moe_device, dtype=torch.int32),
-        )
+        key = (moe_device.index, tuple(int(value) for value in slots.tolist()))
+        slot_gpu = slot_cache.get(key)
+        if slot_gpu is None:
+            host = slots if slots.is_pinned() else slots.pin_memory()
+            slot_gpu = host.to(device=moe_device, non_blocking=True)
+            slot_cache[key] = slot_gpu
+        used = segments[rank].seqused
+        if used.device != moe_device or used.dtype != torch.int32:
+            used = used.to(device=moe_device, dtype=torch.int32)
+        lens[rank].index_copy_(0, slot_gpu, used)
     out = torch.empty(batch, heads, dim, dtype=q.dtype, device=moe_device)
     if marks is not None:
         marks["merge_begin"] = torch.cuda.Event(True)

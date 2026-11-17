@@ -1,9 +1,11 @@
 """Wall time for decode CP, including the LSE merge.
 
-KV for each half is resident before the timer. The timed window is the
-Q / O / LSE route, both FA2 calls, and the merge. The route is the N-rank
-table in ``comm_cp``; this script happens to use two devices. It does not
-call the head-TP operator.
+KV for each half is resident before the timer. The timed window is one
+CUDA-graph replay of the Q / O / LSE route, both FA2 calls, and the merge.
+The route is the N-rank table in ``comm_cp``; this script happens to use
+two devices. It does not call the head-TP operator. The merge column is the
+warmed eager ``combine_kv``, because an event recorded inside the graph is
+not queried.
 
 The default matrix is the head-TP perf list in
 ``test_head_tp_paged_gpu.py``: five pure-long batches, then a short batch
@@ -67,6 +69,52 @@ def _place(segment, device) -> SegmentBatch:
     )
 
 
+def _capture(streams, work):
+    """Warm ``work`` once, then record it as one CUDA graph.
+
+    Device 1's stream is forked from the capturing stream and joined back
+    before the graph ends, so a replay on GPU0 waits for GPU1. Events stay
+    outside the graph: an event recorded during capture cannot be queried
+    with ``elapsed_time`` on every driver.
+    """
+    work()
+    torch.cuda.synchronize()
+    root = streams[0]
+    for stream in streams[1:]:
+        torch.cuda.set_device(stream.device)
+        torch.cuda.set_stream(stream)
+    torch.cuda.set_device(root.device)
+    root.wait_stream(torch.cuda.current_stream(root.device))
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.stream(root):
+        with torch.cuda.graph(graph, stream=root):
+            if len(streams) > 1:
+                started = root.record_event()
+                for stream in streams[1:]:
+                    stream.wait_event(started)
+            work()
+            for stream in streams[1:]:
+                root.wait_event(stream.record_event())
+    torch.cuda.current_stream(root.device).wait_stream(root)
+    torch.cuda.set_device(root.device)
+    return graph
+
+
+def _replay_median(graph, root, rounds: int) -> float:
+    wall0 = torch.cuda.Event(True)
+    wall1 = torch.cuda.Event(True)
+    samples = []
+    for _ in range(rounds):
+        with torch.cuda.stream(root):
+            wall0.record(root)
+            graph.replay()
+            wall1.record(root)
+        wall1.synchronize()
+        samples.append(wall0.elapsed_time(wall1))
+    samples.sort()
+    return samples[len(samples) // 2]
+
+
 def _time_case(seqs, n_long, rounds=5):
     # One GPU cannot hold the full cache and both slices. Build on CPU, then
     # drop the full cache before either slice is copied. This is outside the timer.
@@ -83,32 +131,24 @@ def _time_case(seqs, n_long, rounds=5):
     )
     master_lens, partner_lens = segment_limits(seqs, n_long)
     max_ks = [max(master_lens), max(partner_lens)]
-    stream0 = torch.cuda.current_stream(device=0)
-    torch.cuda.synchronize()
+    stream0 = torch.cuda.Stream(device=0)
+    stream1 = torch.cuda.Stream(device=1)
+    marks = {}
 
     def once():
-        wall0 = torch.cuda.Event(True)
-        wall1 = torch.cuda.Event(True)
-        marks = {}
-        wall0.record(stream0)
         run_routed(
             [master, partner], moe_rank=0, devices=devices, mask=mask,
             max_ks=max_ks, comm=comm, sync=False, marks=marks,
         )
-        wall1.record(stream0)
-        wall1.synchronize()
-        return wall0.elapsed_time(wall1), marks["merge_begin"].elapsed_time(marks["merge_end"])
 
+    # The first eager step compiles Triton. The second is the merge kernel.
+    # Capture then overwrites these events with ones recorded in the graph.
     once()
-    walls = []
-    merges = []
-    for _ in range(rounds):
-        wall, merge = once()
-        walls.append(wall)
-        merges.append(merge)
-    walls.sort()
-    merges.sort()
-    return walls[len(walls) // 2], merges[len(merges) // 2]
+    once()
+    torch.cuda.synchronize()
+    merge = marks["merge_begin"].elapsed_time(marks["merge_end"])
+    graph = _capture([stream0, stream1], once)
+    return _replay_median(graph, stream0, rounds), merge
 
 
 def main():
@@ -118,7 +158,7 @@ def main():
         wall, merge = _time_case(seqs, n_long)
         share = 0.0 if wall == 0 else merge / wall
         print(
-            f"{name} wall_ms {wall:.3f} merge_ms {merge:.3f} merge_share {share:.3f}",
+            f"{name} wall_ms {wall:.3f} merge_ms {merge:.3f} merge_share {share:.3f} graph",
             flush=True,
         )
 
