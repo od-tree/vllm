@@ -60,9 +60,10 @@ def test_both_empty_is_zero():
 
 
 def test_batch_major_lse_is_accepted():
-    raw = torch.tensor([[1.0, 2.0], [3.0, 4.0]])  # [B=2, H=2]
-    got = normalize_lse_to_head_major(raw, num_heads=2, batch=2)
-    assert got.shape == (2, 2)
+    # H and B must differ. A square tensor matches the head-major check first.
+    raw = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # [B=2, H=3]
+    got = normalize_lse_to_head_major(raw, num_heads=3, batch=2)
+    assert got.shape == (3, 2)
     assert torch.allclose(got, raw.transpose(0, 1))
 
 

@@ -18,7 +18,7 @@
 | 切分 | 长请求：owner 持 KV0 + Q[0:8)，partner 持 KV1 + Q[8:16)；短请求本地全头 |
 | KV | paged；长行按 tile 再切 KV 以提高 SM 占用 |
 | 通信 | 算子内融合：每 decode 步交换**当前 token** 的 Q/K/V；结果 **按头拼接**，**无 LSE** |
-| 已测环境 | 2×A100-SXM4-40GB（NVLink）；混合超长尾相对单卡启发式 split 墙钟比约 **0.23–0.42**（见 [head_tp_design_status.md](head_tp_design_status.md) 注释表） |
+| 已测环境 | 2×A100-SXM4-40GB（NVLink）见 [head_tp_design_status.md](head_tp_design_status.md) 注释表。2×RTX 5090 的 head-TP 与 NanoCP 同一组 case 在 [5090_compare.md](5090_compare.md) |
 
 ### 1.2 对比对象 NanoCP 想回答的问题
 

@@ -96,12 +96,14 @@ def relocate_kv(segment: SegmentBatch, device) -> SegmentBatch:
         target = torch.device(device)
     if segment.k.device == target:
         return segment
+    from cuda_ipc_p2p import copy_tensor
+
     return SegmentBatch(
         segment.q,
-        segment.k.to(target),
-        segment.v.to(target),
-        segment.table.to(target),
-        segment.seqused.to(target),
+        copy_tensor(segment.k, target),
+        copy_tensor(segment.v, target),
+        copy_tensor(segment.table, target),
+        copy_tensor(segment.seqused, target),
         segment.which,
         segment.lengths,
         segment.n_long,

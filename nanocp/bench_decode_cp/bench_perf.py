@@ -19,6 +19,7 @@ import sys
 import torch
 
 from comm_cp import CpComm, enable_peers
+from cuda_ipc_p2p import capture_graph, replay_median
 from decode_cp import run_routed
 from layout_cp import SegmentBatch, build_segments, segment_limits
 
@@ -83,32 +84,25 @@ def _time_case(seqs, n_long, rounds=5):
     )
     master_lens, partner_lens = segment_limits(seqs, n_long)
     max_ks = [max(master_lens), max(partner_lens)]
-    stream0 = torch.cuda.current_stream(device=0)
-    torch.cuda.synchronize()
+    stream0 = torch.cuda.Stream(device=0)
+    stream1 = torch.cuda.Stream(device=1)
+    marks = {}
 
     def once():
-        wall0 = torch.cuda.Event(True)
-        wall1 = torch.cuda.Event(True)
-        marks = {}
-        wall0.record(stream0)
         run_routed(
             [master, partner], moe_rank=0, devices=devices, mask=mask,
             max_ks=max_ks, comm=comm, sync=False, marks=marks,
         )
-        wall1.record(stream0)
-        wall1.synchronize()
-        return wall0.elapsed_time(wall1), marks["merge_begin"].elapsed_time(marks["merge_end"])
 
+    # The first eager step compiles Triton, so its event span is not the kernel.
+    # A second eager step is. Capture then overwrites the events with ones
+    # recorded inside the graph, which this driver will not time.
     once()
-    walls = []
-    merges = []
-    for _ in range(rounds):
-        wall, merge = once()
-        walls.append(wall)
-        merges.append(merge)
-    walls.sort()
-    merges.sort()
-    return walls[len(walls) // 2], merges[len(merges) // 2]
+    once()
+    torch.cuda.synchronize()
+    merge = marks["merge_begin"].elapsed_time(marks["merge_end"])
+    graph = capture_graph([stream0, stream1], once)
+    return replay_median(graph, stream0, rounds), merge
 
 
 def main():
@@ -118,7 +112,7 @@ def main():
         wall, merge = _time_case(seqs, n_long)
         share = 0.0 if wall == 0 else merge / wall
         print(
-            f"{name} wall_ms {wall:.3f} merge_ms {merge:.3f} merge_share {share:.3f}",
+            f"{name} wall_ms {wall:.3f} merge_ms {merge:.3f} merge_share {share:.3f} graph",
             flush=True,
         )
 

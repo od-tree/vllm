@@ -182,8 +182,11 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
     batch, heads, dim = q.shape
     lens = torch.zeros(world, batch, dtype=torch.int32, device=moe_device)
     for rank, slots, _out, _lse in produced:
+        from cuda_ipc_p2p import copy_tensor
+
         lens[rank].index_copy_(
-            0, slots.to(moe_device), segments[rank].seqused.to(device=moe_device, dtype=torch.int32),
+            0, copy_tensor(slots, moe_device),
+            copy_tensor(segments[rank].seqused, moe_device, dtype=torch.int32),
         )
     out = torch.empty(batch, heads, dim, dtype=q.dtype, device=moe_device)
     if marks is not None:
