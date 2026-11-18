@@ -35,20 +35,20 @@ def test_long_rows_are_split_ahead_of_short_rows():
         num_kv_heads=2, num_sms=108,
     )
 
-    # 108 * 262144 / ((262144 + 131072) * 1) = 72, capped at 16.
-    # 108 * 131072 / (393216 * 1) = 36, capped at 16.
-    assert splits == [16, 16, 1, 1]
-    assert max_splits == 16
+    # One local KV head. Short-row work reduces the long-row budget to 107 CTAs.
+    # Together that is one wave. The old cap of 16 left only 32 CTAs.
+    assert splits == [71, 36, 1, 1]
+    assert max_splits == 71
     decoded = [_unpack(tile) for tile in tiles]
-    long_tiles = decoded[: 16 + 16]
-    short_tiles = decoded[16 + 16 :]
+    long_tiles = decoded[: 71 + 36]
+    short_tiles = decoded[71 + 36 :]
     assert long_tiles == [
-        (0, 0, split) for split in range(16)
+        (0, 0, split) for split in range(71)
     ] + [
-        (1, 0, split) for split in range(16)
+        (1, 0, split) for split in range(36)
     ]
     assert short_tiles == [(2, 0, 0), (2, 1, 0), (3, 0, 0), (3, 1, 0)]
-    assert pack_head_tp_tile(1, 0, 3) == tiles[16 + 3]
+    assert pack_head_tp_tile(1, 0, 3) == tiles[71 + 3]
 
 
 def test_partner_rank_uses_its_own_kv_head():
@@ -61,8 +61,8 @@ def test_partner_rank_uses_its_own_kv_head():
         [262144], ["long"], HeadTPStep(plans={"long": plan}, active=True),
         rank=1, num_kv_heads=2, num_sms=108,
     )
-    assert splits == [16]
-    assert [_unpack(tile)[1] for tile in tiles] == [1] * 16
+    assert splits == [108]
+    assert [_unpack(tile)[1] for tile in tiles] == [1] * 108
 
 
 def _saturated(n: int):

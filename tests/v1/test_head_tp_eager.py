@@ -535,3 +535,4 @@ def test_mixed_batch_matches_full_attention_after_gate_and_output_proj():
     mixed_hidden = F.linear(mixed * torch.sigmoid(gate), weight)
     torch.testing.assert_close(mixed_hidden, reference_hidden, atol=1e-5, rtol=1e-5)
     assert mixed_hidden.shape[0] == 3
+    torch.testing.assert_close(owner_cache, reference_cache, rtol=0, atol=0)

@@ -10,7 +10,7 @@ the KV heads, and a request that is still in prefill is left untouched.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from vllm.utils.math_utils import cdiv
 from vllm.v1.head_tp import (
@@ -19,7 +19,9 @@ from vllm.v1.head_tp import (
     make_plan,
     make_shards,
 )
-from vllm.v1.request import Request
+
+if TYPE_CHECKING:
+    from vllm.v1.request import Request
 
 RECHECK_INTERVAL = 32
 MIN_COLLAB_TOKENS = 64
@@ -102,9 +104,8 @@ class LengthBucketEMA:
         num_output_tokens: int,
     ) -> int:
         key = self.bucket(prompt_len, prefix_hit_tokens)
-        if key not in self.means:
-            return max(0, max_tokens - num_output_tokens)
-        return max(0, int(self.means[key]))
+        total = min(max_tokens, int(self.means.get(key, max_tokens)))
+        return max(0, total - num_output_tokens)
 
     def observe(self, request: Request) -> None:
         key = self.bucket(request.num_prompt_tokens, request.prefix_cpu_hit_tokens)

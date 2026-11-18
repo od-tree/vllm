@@ -16,8 +16,6 @@ from typing import Any, Protocol
 import torch
 import torch.nn.functional as F
 
-from vllm.distributed.parallel_state import get_dp_group
-from vllm.forward_context import get_forward_context, override_forward_context
 from vllm.v1.head_tp import (
     HeadTPBatch,
     HeadTPShard,
@@ -37,9 +35,13 @@ class DPHeadTPTransport:
     """Point-to-point over the existing data-parallel group."""
 
     def send(self, dst: int, payload: dict[str, Any]) -> None:
+        from vllm.distributed.parallel_state import get_dp_group
+
         get_dp_group().send_tensor_dict(payload, dst=dst)
 
     def recv(self, src: int) -> dict[str, Any]:
+        from vllm.distributed.parallel_state import get_dp_group
+
         received = get_dp_group().recv_tensor_dict(src=src)
         if received is None:
             raise RuntimeError(
@@ -133,19 +135,11 @@ def _gather_heads(
     positions = torch.arange(seq_len, device=block_table.device)
     block_ids = block_table[positions // block_size].to(torch.long)
     offsets = positions % block_size
-    blocks = cache.index_select(0, block_ids.to(cache.device))
-    index = offsets.to(cache.device).view(-1, 1, 1, 1).expand(
-        seq_len, kv_per, 1, head_dim
-    )
-    if layout == "packed_head_major":
-        k_all = blocks[:, kv_start:kv_end, :, :head_dim]
-        v_all = blocks[:, kv_start:kv_end, :, head_dim:]
-    else:
-        k_all = blocks[:, :, kv_start:kv_end, :head_dim].permute(0, 2, 1, 3)
-        v_all = blocks[:, :, kv_start:kv_end, head_dim:].permute(0, 2, 1, 3)
-    k = k_all.gather(2, index).squeeze(2)
-    v = v_all.gather(2, index).squeeze(2)
-    return k, v
+    # Gather each visible token once. Selecting a whole page per token first
+    # expands the temporary by block_size for long contexts.
+    token_major = cache.transpose(1, 2) if layout == "packed_head_major" else cache
+    packed = token_major[block_ids.to(cache.device), offsets.to(cache.device), kv_start:kv_end]
+    return packed[..., :head_dim], packed[..., head_dim:]
 
 
 def _sdpa_gqa(
@@ -353,23 +347,19 @@ def _owner_shard_forward(
     block_size: int,
 ) -> torch.Tensor:
     q_per = shard.q_range[1] - shard.q_range[0]
-    kv_per = shard.kv_range[1] - shard.kv_range[0]
     if not rows:
         return q.new_empty(0, q_per, head_dim)
     row_index = torch.tensor(rows, dtype=torch.long, device=q.device)
     q_part = _slice_heads(q, row_index, shard.q_range, num_heads, head_dim)
-    k_part = _slice_heads(k, row_index, shard.kv_range, num_kv_heads, head_dim)
-    v_part = _slice_heads(v, row_index, shard.kv_range, num_kv_heads, head_dim)
     slots = slot_mapping.index_select(0, row_index)
+    # The eager owner retains full-width pages. Refresh all heads so the
+    # scheduler can return this request to ordinary local attention next step.
+    full_heads = (0, num_kv_heads)
     write_kv_range(
-        cache,
-        slots,
-        k_part,
-        v_part,
-        shard.kv_range,
-        num_kv_heads=num_kv_heads,
-        head_dim=head_dim,
-        block_size=block_size,
+        cache, slots,
+        _slice_heads(k, row_index, full_heads, num_kv_heads, head_dim),
+        _slice_heads(v, row_index, full_heads, num_kv_heads, head_dim),
+        full_heads, num_kv_heads=num_kv_heads, head_dim=head_dim, block_size=block_size,
     )
     return eager_gqa_decode(
         q_part,
@@ -422,6 +412,8 @@ def run_mixed_head_attention(
         q_local = q.index_select(0, local_rows)
         k_local = k.index_select(0, local_rows)
         v_local = v.index_select(0, local_rows)
+        from vllm.forward_context import get_forward_context, override_forward_context
+
         ctx = get_forward_context()
         local_ctx = replace(
             ctx,

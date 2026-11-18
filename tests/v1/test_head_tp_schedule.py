@@ -365,6 +365,8 @@ def test_length_bucket_starts_at_max_tokens_then_uses_the_mean():
     done.append_output_token_ids([1] * 20)
     lengths.observe(done)
     assert lengths.means[(1, 0)] == 14
+    assert lengths.predict(256, 0, 40, 9) == 5
+    assert lengths.predict(256, 0, 12, 9) == 3
     assert lengths.predict(255, 0, 40, 0) == 40
 
 

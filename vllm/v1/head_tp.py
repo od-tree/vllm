@@ -14,6 +14,13 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 
+from vllm.v1.decode_tiles import (
+    HEAD_TP_SPLIT_CAP,
+    flash_attn_split_kv_block_tokens as flash_attn_split_kv_block_tokens,
+    pack_head_tp_tile as pack_head_tp_tile,
+    plan_decode_tiles,
+)
+
 if TYPE_CHECKING:
     from vllm.v1.worker.gpu.input_batch import InputBatch
 
@@ -207,27 +214,6 @@ def make_plan(
     )
 
 
-HEAD_TP_SPLIT_CAP = 16
-
-
-def flash_attn_split_kv_block_tokens(head_size: int) -> int:
-    """FA2 split-KV tile width. Must match ``set_params_splitkv`` in flash_api.cpp."""
-
-    if head_size <= 64:
-        return 256
-    if head_size <= 128:
-        return 128
-    return 64
-
-
-def pack_head_tp_tile(row: int, head: int, split: int) -> int:
-    """One compute CTA. Bits 0-15 are the row, 16-23 the KV head, 24-31 the split."""
-
-    if not (0 <= row <= 0xFFFF and 0 <= head <= 0xFF and 0 <= split <= 0xFF):
-        raise ValueError(f"tile ({row}, {head}, {split}) does not fit in one int32")
-    return row | (head << 16) | (split << 24)
-
-
 def _active_shard(step: HeadTPStep | None, req_id: str, rank: int) -> HeadTPShard | None:
     if step is None:
         return None
@@ -238,28 +224,6 @@ def _active_shard(step: HeadTPStep | None, req_id: str, rank: int) -> HeadTPShar
         if shard.rank == rank:
             return shard
     raise ValueError(f"{req_id} is an active head-TP request but rank {rank} has no shard")
-
-
-def _splits_for_full_waves(long_heads: int, num_sms: int, cap: int) -> int:
-    """How many times to split each long head once the SMs are already full.
-
-    One split leaves a partial last wave that still scans the whole segment.
-    The result minimizes ``ceil(long_heads * splits / num_sms) / splits``,
-    the scan time in units of one full segment. A tie keeps the smaller
-    split so the combine loop stays short.
-    """
-
-    if long_heads <= 0 or num_sms <= 0:
-        return 1
-    cap = max(1, cap)
-    best_splits = 1
-    best_waves = (long_heads + num_sms - 1) // num_sms
-    for splits in range(2, cap + 1):
-        waves = (long_heads * splits + num_sms - 1) // num_sms
-        if waves * best_splits < best_waves * splits:
-            best_splits = splits
-            best_waves = waves
-    return best_splits
 
 
 def build_head_tp_tile_plan(
@@ -275,13 +239,12 @@ def build_head_tp_tile_plan(
     """CTA list for one decode step. Long rows are first and split by length.
 
     Short rows and inactive plans get one CTA per KV head. While the long
-    heads do not fill the SMs, those rows share about ``num_sms`` CTAs.
-    Once they already fill the SMs, each long head is split again so the
-    partial last wave scans a shorter piece. Each row is capped at
-    ``split_cap`` and at the number of FA2 KV tiles
-    (``ceil(seq / kv_block_tokens)``), so a short long-row does not launch
-    empty splits. The result is host data; the caller uploads it once and
-    every layer of this step reads the same copy.
+    heads do not fill the SMs, those rows share one wave: the split count
+    follows the length, so one local KV head uses more splits than two.
+    The split stops at 127 and at the number of FA2 KV tiles. Once the long
+    heads already fill the SMs, ``split_cap`` bounds a second search that
+    shortens the partial last wave. The result is host data; the caller
+    uploads it once and every layer of this step reads the same copy.
     """
 
     if len(seq_lens) != len(req_ids):
@@ -300,34 +263,10 @@ def build_head_tp_tile_plan(
             short_rows.append(index)
         else:
             long_rows.append((index, shard))
-    long_heads = sum(shard.kv_range[1] - shard.kv_range[0] for _, shard in long_rows)
-    row_splits = [1] * len(req_ids)
-    if long_rows and long_heads < num_sms:
-        total = sum(max(seq_lens[index], 1) for index, _ in long_rows)
-        for index, shard in long_rows:
-            heads = shard.kv_range[1] - shard.kv_range[0]
-            seq = max(seq_lens[index], 1)
-            raw = (num_sms * seq) // (total * heads)
-            n_blocks = max(1, (seq + kv_block_tokens - 1) // kv_block_tokens)
-            row_splits[index] = min(split_cap, n_blocks, max(1, raw))
-    elif long_rows:
-        max_seq = max(max(seq_lens[index], 1) for index, _ in long_rows)
-        max_blocks = max(1, (max_seq + kv_block_tokens - 1) // kv_block_tokens)
-        chosen = _splits_for_full_waves(long_heads, num_sms, min(split_cap, max_blocks))
-        for index, _shard in long_rows:
-            seq = max(seq_lens[index], 1)
-            n_blocks = max(1, (seq + kv_block_tokens - 1) // kv_block_tokens)
-            raw = max(1, chosen * seq // max_seq)
-            row_splits[index] = min(split_cap, n_blocks, raw)
-    tiles: list[int] = []
-    for index, shard in long_rows:
-        for split in range(row_splits[index]):
-            for head in range(shard.kv_range[0], shard.kv_range[1]):
-                tiles.append(pack_head_tp_tile(index, head, split))
-    for index in short_rows:
-        for head in range(num_kv_heads):
-            tiles.append(pack_head_tp_tile(index, head, 0))
-    return tiles, row_splits, max(row_splits)
+    return plan_decode_tiles(
+        seq_lens, [(i, *shard.kv_range) for i, shard in long_rows], short_rows,
+        num_kv_heads, num_sms, split_cap, kv_block_tokens,
+    )
 
 
 def exchange_schedule(
