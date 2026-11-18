@@ -30,8 +30,30 @@ def empty_partial(q: torch.Tensor):
     return out, lse
 
 
+def paged_fwd(q, k, v, block_table, seqused, cu_q, cu_k, out, max_seqlen_k,
+              num_splits=0, tile_plan=None):
+    """FA2 and its intra-rank combine with caller-owned buffers."""
+    if tile_plan is None:
+        tiles, row_splits, max_splits = None, None, 0
+    else:
+        tiles, row_splits, max_splits = tile_plan
+    # Head exchange stays off. The last three arguments are the optional CTA list.
+    return _ops().varlen_fwd(
+        q, k, v, out, cu_q, cu_k, seqused, None, block_table, None,
+        1, int(max_seqlen_k), 0.0, SCALE, True, False, -1, -1, 0.0, False,
+        int(num_splits), None,
+        None, 0, 0, -1, *([None] * 16), 0, 0, 0, tiles, row_splits, int(max_splits),
+    )
+
+
+def decode_offsets(batch, device):
+    cu_q = torch.arange(batch + 1, dtype=torch.int32, device=device)
+    return cu_q, torch.zeros_like(cu_q)
+
+
 def attn_local(q, k, v, block_table, seqused, num_splits: int = 0,
-               max_seqlen_k: int | None = None, tile_plan=None):
+               max_seqlen_k: int | None = None, tile_plan=None, offsets=None,
+               may_have_empty_rows=True):
     """Run one decode step.
 
     ``q`` is ``[B, 16, 256]`` bf16. Returns ``(out, lse)`` with ``out`` the
@@ -52,28 +74,18 @@ def attn_local(q, k, v, block_table, seqused, num_splits: int = 0,
     if q.is_cuda:
         torch.cuda.set_device(q.device)
     device = q.device
-    cu_q = torch.arange(batch + 1, dtype=torch.int32, device=device)
-    cu_k = torch.zeros(batch + 1, dtype=torch.int32, device=device)
+    cu_q, cu_k = offsets if offsets is not None else decode_offsets(batch, device)
     out = torch.empty_like(q)
-    if tile_plan is None:
-        tiles, row_splits, max_splits = None, None, 0
-    else:
-        tiles, row_splits, max_splits = tile_plan
-    # Head exchange stays off. The last three arguments are the optional CTA list.
-    ret = _ops().varlen_fwd(
-        q, k, v, out, cu_q, cu_k, seqused, None, block_table, None,
-        1, int(max_seqlen_k), 0.0, SCALE, True, False, -1, -1, 0.0, False,
-        int(num_splits), None,
-        None, 0, 0, -1, *([None] * 16), 0, 0, 0, tiles, row_splits, int(max_splits),
-    )
+    ret = paged_fwd(q, k, v, block_table, seqused, cu_q, cu_k, out, max_seqlen_k,
+                    num_splits, tile_plan)
     if not isinstance(ret, (tuple, list)) or len(ret) < 2 or ret[1] is None:
         raise RuntimeError(f"varlen_fwd did not return an LSE (got {type(ret)})")
     lse = normalize_lse_to_head_major(ret[1], Q, batch)
     if tuple(lse.shape) != (Q, batch):
         raise RuntimeError(f"normalized LSE shape {tuple(lse.shape)} != {(Q, batch)}")
     # A row with seqused 0 must not contribute, even when another row sets max_seqlen_k.
-    # Multiplying here does not sync; the lengths already live on the GPU.
-    row_ok = (seqused.view(batch) > 0).to(dtype=out.dtype).view(batch, 1, 1)
-    out.mul_(row_ok)
-    lse = torch.where(seqused.view(1, batch) > 0, lse, torch.full_like(lse, float("-inf")))
+    if may_have_empty_rows:
+        empty = seqused.view(batch) == 0
+        out.masked_fill_(empty.view(batch, 1, 1), 0)
+        lse = lse.masked_fill(empty.view(1, batch), float("-inf"))
     return out, lse

@@ -104,6 +104,54 @@ def _arange_covers(slots: torch.Tensor, rows: int) -> bool:
     return torch.equal(slots, expected)
 
 
+def _contiguous_bounds(index: torch.Tensor) -> tuple[int, int] | None:
+    """``(start, count)`` when ``index`` is the increasing run ``start .. start+count``."""
+    count = int(index.numel())
+    if count == 0:
+        return None
+    start = int(index[0])
+    if start < 0:
+        return None
+    if count > 1 and int(index[-1]) != start + count - 1:
+        return None
+    if count > 1 and not torch.equal(index, torch.arange(start, start + count, dtype=index.dtype)):
+        return None
+    return start, count
+
+
+def _active_rows(dst: int, batch: int, mask: torch.Tensor | None,
+                 dst_row_indices: torch.Tensor | None, slots: torch.Tensor | None,
+                 is_transpose: bool) -> tuple[torch.Tensor, torch.Tensor]:
+    """CPU long ``(source_row, dest_slot)`` for rows that actually move to ``dst``.
+
+    Transpose reads ``value[dst * batch + token]`` and writes slot ``token``.
+    A mask writes slot ``token`` unless ``slots`` remaps it. ``dst_row_indices``
+    writes the listed slot and skips negatives.
+    """
+    if is_transpose:
+        if mask is None:
+            raise ValueError("transpose memcpy needs a mask")
+        if mask.device.type != "cpu":
+            raise RuntimeError("routing mask must already be on CPU")
+        tokens = torch.nonzero(mask[dst, :batch] != 0, as_tuple=False).flatten().to(torch.long)
+        return tokens + dst * batch, tokens
+    if dst_row_indices is not None:
+        if dst_row_indices.device.type != "cpu":
+            raise RuntimeError("dst_row_indices must already be on CPU")
+        chosen = dst_row_indices[dst, :batch].to(dtype=torch.long)
+        tokens = torch.nonzero(chosen >= 0, as_tuple=False).flatten()
+        return tokens, chosen.index_select(0, tokens)
+    if mask is not None:
+        if mask.device.type != "cpu":
+            raise RuntimeError("routing mask must already be on CPU")
+        tokens = torch.nonzero(mask[dst, :batch] != 0, as_tuple=False).flatten().to(torch.long)
+        if slots is None:
+            return tokens, tokens
+        return tokens, slots.index_select(0, tokens)
+    rows = torch.arange(batch, dtype=torch.long)
+    return rows, rows
+
+
 class CpComm:
     """Preallocated Q / O / LSE routes across ``devices``."""
 
@@ -152,12 +200,24 @@ class CpComm:
         }
         self._ipc = None
         self._memcpy = False
+        self._pack_index = {}
+        self._pack_host = {}
+        self._pack_buf = None
         cuda_ids = [device.index for device in self.devices if device.type == "cuda"]
         if len(set(cuda_ids)) > 1:
             from cuda_ipc_p2p import use_memcpy
 
             self._memcpy = use_memcpy()
-        if not self._memcpy:
+        if self._memcpy:
+            # Scatter target for active rows that are not already one slice.
+            self._pack_buf = {
+                name: [
+                    torch.empty((max_batch, *shape), dtype=self.dtypes[name], device=device)
+                    for device in self.devices
+                ]
+                for name, shape in self.shapes.items()
+            }
+        else:
             self._prepare_tables()
 
     def _prepare_tables(self) -> None:
@@ -474,16 +534,35 @@ class CpComm:
         ))
         return launch
 
+    def _cached_index(self, index: torch.Tensor, device: torch.device) -> torch.Tensor:
+        """GPU copy of a CPU index. Reused so a capture does not upload it again."""
+        flat = index.detach().to(dtype=torch.long, device="cpu").contiguous()
+        key = (device.type, device.index, tuple(int(value) for value in flat.tolist()))
+        hit = self._pack_index.get(key)
+        if hit is not None:
+            return hit
+        if device.type == "cuda" and torch.cuda.is_current_stream_capturing():
+            host = flat.pin_memory()
+            gpu = host.to(device, non_blocking=True)
+            self._pack_host[key] = host
+        else:
+            gpu = flat.to(device)
+        self._pack_index[key] = gpu
+        return gpu
+
     def _memcpy_rows(self, channel: str, src: int, value: torch.Tensor,
                      mask: torch.Tensor | None, dst_row_indices: torch.Tensor | None,
                      slots: torch.Tensor | None, is_transpose: bool) -> None:
-        """Place one rank's rows with ``cudaMemcpyPeer``. No device handshake.
+        """Copy each destination's active rows in one shot. No device handshake.
 
-        The destination layout matches the Basic kernel: non-transpose writes
-        ``buffer[src, slot]`` on each destination, and a transpose send reads
+        Inactive rows are left untouched. A contiguous run is one slice copy
+        into ``buffer[src, slot:slot+n]``. Any other pattern is gathered into
+        one packed tensor, copied once, then scattered into the destination
+        slots. Placement matches the per-token Basic kernel: a non-transpose
+        send writes ``buffer[src, slot]``, and a transpose send reads
         ``packed[dst, row]`` into ``buffer[src, row]``.
         """
-        from cuda_ipc_p2p import memcpy_peer
+        from cuda_ipc_p2p import memcpy_peer, on_device_stream
 
         if not value.is_contiguous():
             value = value.contiguous()
@@ -493,25 +572,42 @@ class CpComm:
             if slots.numel() != batch:
                 raise ValueError(f"memcpy slots {slots.numel()} != rows {batch}")
         for dst in range(self.world):
-            buf = self.buffers[channel][dst]
-            for token in range(batch):
-                if is_transpose:
-                    if mask is not None and int(mask[dst, token]) == 0:
-                        continue
-                    row = value[dst * batch + token]
-                    memcpy_peer(buf[src, token], row)
-                    continue
-                if dst_row_indices is not None:
-                    slot = int(dst_row_indices[dst, token])
-                    if slot < 0:
-                        continue
-                elif mask is not None:
-                    if int(mask[dst, token]) == 0:
-                        continue
-                    slot = int(slots[token]) if slots is not None else token
-                else:
-                    slot = token
-                memcpy_peer(buf[src, slot], value[token])
+            src_rows, dst_slots = _active_rows(
+                dst, batch, mask, dst_row_indices, slots, is_transpose,
+            )
+            count = int(src_rows.numel())
+            if count == 0:
+                continue
+            plane = self.buffers[channel][dst][src]
+            if int(dst_slots.max()) >= plane.shape[0] or int(dst_slots.min()) < 0:
+                raise ValueError(
+                    f"memcpy slot {int(dst_slots.min())}..{int(dst_slots.max())} "
+                    f"outside buffer {plane.shape[0]}"
+                )
+            src_bounds = _contiguous_bounds(src_rows)
+            dst_bounds = _contiguous_bounds(dst_slots)
+            if src_bounds is not None:
+                src_start, _ = src_bounds
+                if src_start + count > value.shape[0]:
+                    raise ValueError(
+                        f"memcpy source {src_start}:{src_start + count} outside {value.shape[0]}"
+                    )
+                packed = value[src_start:src_start + count]
+            else:
+                src_gpu = self._cached_index(src_rows, value.device)
+                with on_device_stream(value.device):
+                    packed = value.index_select(0, src_gpu)
+            if not packed.is_contiguous():
+                packed = packed.contiguous()
+            if dst_bounds is not None:
+                dst_start, _ = dst_bounds
+                memcpy_peer(plane[dst_start:dst_start + count], packed)
+                continue
+            staged = self._pack_buf[channel][dst][:count]
+            memcpy_peer(staged, packed)
+            slot_gpu = self._cached_index(dst_slots, plane.device)
+            with on_device_stream(plane.device):
+                plane.index_copy_(0, slot_gpu, staged)
 
     def _put(self, channel: str, value: torch.Tensor, transfer: Transfer):
         """CPU placement. CUDA goes through the Basic kernel."""

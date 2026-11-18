@@ -1,8 +1,8 @@
 """Compose one decode-CP step: local FA2 on each rank, then the NanoCP combine.
 
 The master segment contains every row, including short rows at full length.
-The partner segment contains long-row suffixes only. Short rows are mask 0
-on the partner, so they stay inside the master's single attention call.
+The partner computes routed long-row suffixes and its own local rows in one
+attention call. Only the routed rows return to the master.
 Nothing here writes the head-TP exchange buffers.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import torch
 
-from attn_local import attn_local
+from attn_local import attn_local, decode_offsets
 from comm_cp import CpComm, as_device
 from layout_cp import SegmentBatch
 from merge_cp import combine_kv
@@ -100,7 +100,8 @@ def _select_segment(segment: SegmentBatch, slots: torch.Tensor, full_batch: int)
 
 def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch.Tensor,
                num_splits: int = 0, max_ks: list[int] | None = None,
-               comm: CpComm | None = None, sync: bool = True, marks: dict | None = None):
+               comm: CpComm | None = None, sync: bool = True, marks: dict | None = None,
+               local_outputs=None, mark=lambda name: None, context_lens=None):
     """One decode step. KV already lives on each rank. Q, O, and LSE are routed.
 
     ``segments[r]`` is rank ``r``'s compacted pages, on ``devices[r]``. A
@@ -129,6 +130,7 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
             lse_shape=(q.shape[1], 1), q_dtype=q.dtype, o_dtype=q.dtype,
         )
     q_launch = comm.launch_q(moe_rank, q, mask=mask, sync=False)
+    mark("q_route")
     order = [moe_rank] + [rank for rank in range(world) if rank != moe_rank]
     produced = []
     for rank in order:
@@ -137,19 +139,37 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
             continue
         comm.wait(q_launch, rank)
         q_rank = comm.buffer_rows("q", rank, moe_rank, slots)
-        k, v, table, used = _select_segment(segments[rank], slots, q.shape[0])
+        segment = segments[rank]
+        routed = slots.numel()
+        if segment.local_tail:
+            if rank == moe_rank or routed + segment.local_tail != len(segment.lengths):
+                raise ValueError("partner batch must contain routed rows followed by local rows")
+            q_rank = torch.cat((q_rank, segment.q[routed:]))
+            k, v, table, used = segment.k, segment.v, segment.table, segment.seqused
+        else:
+            k, v, table, used = _select_segment(segment, slots, q.shape[0])
         max_k = None if max_ks is None else max_ks[rank]
+        rows = len(q_rank)
+        offsets_key = (rows, q_rank.device)
+        if offsets_key not in segment.offsets:
+            segment.offsets[offsets_key] = decode_offsets(rows, q_rank.device)
         out, lse = attn_local(
             q_rank, k, v, table, used, num_splits=num_splits, max_seqlen_k=max_k,
-            tile_plan=segment_tiles(segments[rank]) if num_splits < 1 else None,
+            tile_plan=segment_tiles(segment) if num_splits < 1 and rows == len(segment.lengths) else None,
+            offsets=segment.offsets[offsets_key],
+            may_have_empty_rows=not segment.lengths or 0 in segment.lengths,
         )
-        produced.append((rank, slots, out, lse))
+        if segment.local_tail and local_outputs is not None:
+            local_outputs[rank] = out[routed:]
+        produced.append((rank, slots, out[:routed], lse[:, :routed], used[:routed]))
+    mark("attention")
     staged = []
     produced_ranks = set()
-    for rank, slots, out, lse in produced:
+    for rank, slots, out, lse, _used in produced:
         produced_ranks.add(rank)
         lse_rows = lse.transpose(0, 1).contiguous().unsqueeze(-1)
         staged.append((rank, _stage_return(comm, rank, slots, out, lse_rows, moe_rank)))
+    mark("stage_returns")
     # O from every rank, then LSE. One process cannot enter the next channel
     # while this GPU's O kernel is still waiting for a partner that has not
     # launched. A rank with no partial still has to enter the kernel.
@@ -159,6 +179,7 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
     for rank in range(world):
         if rank not in produced_ranks:
             comm.participate("o", rank)
+    mark("o_return")
     for rank, (o_in, lse_in, mask) in staged:
         partial_launches.append(comm.launch_return("lse", rank, lse_in, mask, sync=False))
     for rank in range(world):
@@ -176,18 +197,21 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
                 comm.wait(launch, dst)
                 if comm.devices[dst].type == "cuda":
                     torch.cuda.current_stream(comm.devices[dst]).synchronize()
+    mark("lse_return")
     moe_device = q.device
     if moe_device.type == "cuda":
         torch.cuda.set_device(moe_device)
     batch, heads, dim = q.shape
-    lens = torch.zeros(world, batch, dtype=torch.int32, device=moe_device)
-    for rank, slots, _out, _lse in produced:
-        from cuda_ipc_p2p import copy_tensor
+    lens = context_lens
+    if lens is None:
+        lens = torch.zeros(world, batch, dtype=torch.int32, device=moe_device)
+        for rank, slots, _out, _lse, used in produced:
+            from cuda_ipc_p2p import copy_tensor
 
-        lens[rank].index_copy_(
-            0, copy_tensor(slots, moe_device),
-            copy_tensor(segments[rank].seqused, moe_device, dtype=torch.int32),
-        )
+            lens[rank].index_copy_(
+                0, copy_tensor(slots, moe_device),
+                copy_tensor(used, moe_device, dtype=torch.int32),
+            )
     out = torch.empty(batch, heads, dim, dtype=q.dtype, device=moe_device)
     if marks is not None:
         marks["merge_begin"] = torch.cuda.Event(True)
@@ -201,6 +225,7 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
     if marks is not None:
         marks["merge_end"] = torch.cuda.Event(True)
         marks["merge_end"].record()
+    mark("merge")
     return out
 
 

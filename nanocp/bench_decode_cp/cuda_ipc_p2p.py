@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+from contextlib import nullcontext
 from typing import Iterable
 
 import torch
@@ -180,6 +181,16 @@ def graph_streams_active() -> bool:
     return bool(_GRAPH_STREAMS)
 
 
+def on_device_stream(device: torch.device):
+    """Run the body on the capture stream of ``device`` while a graph is open."""
+    stream = _GRAPH_STREAMS.get(int(device.index)) if device.type == "cuda" else None
+    if stream is not None:
+        return torch.cuda.stream(stream)
+    if device.type == "cuda":
+        return torch.cuda.device(device)
+    return nullcontext()
+
+
 class use_graph_streams:
     """Route peer copies onto these streams for the duration of a capture."""
 
@@ -217,39 +228,51 @@ def capture_graph(streams, work):
     Replaying on the root stream still includes the other GPU, because the
     capture joins that stream back before the graph ends.
     """
-    work()
-    torch.cuda.synchronize()
+    from contextlib import ExitStack
+
     root = streams[0]
-    for stream in streams[1:]:
-        torch.cuda.set_device(stream.device)
-        torch.cuda.set_stream(stream)
-    torch.cuda.set_device(root.device)
-    root.wait_stream(torch.cuda.current_stream(root.device))
-    graph = torch.cuda.CUDAGraph()
-    with torch.cuda.stream(root):
+    for stream in streams:
+        torch.cuda.synchronize(stream.device)
+    with ExitStack() as stack:
+        for stream in reversed(streams):
+            stack.enter_context(torch.cuda.stream(stream))
+        work()
+        for stream in streams:
+            torch.cuda.synchronize(stream.device)
+        graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph, stream=root):
             with use_graph_streams(streams):
                 fork_graph_streams(root)
                 work()
                 join_graph_streams(root)
-    torch.cuda.current_stream(root.device).wait_stream(root)
-    torch.cuda.set_device(root.device)
     return graph
 
 
-def replay_median(graph, root, rounds: int) -> float:
-    wall0 = torch.cuda.Event(True)
-    wall1 = torch.cuda.Event(True)
+def replay_samples(graph, root, rounds: int) -> tuple[list[float], list[float]]:
+    from time import perf_counter_ns
+
+    if rounds < 1:
+        raise ValueError("rounds must be positive")
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
     samples = []
-    for _ in range(rounds):
-        with torch.cuda.stream(root):
-            wall0.record(root)
+    host_samples = []
+    with torch.cuda.stream(root):
+        for _ in range(rounds):
+            host_start = perf_counter_ns()
+            start.record(root)
             graph.replay()
-            wall1.record(root)
-        wall1.synchronize()
-        samples.append(wall0.elapsed_time(wall1))
-    samples.sort()
-    return samples[len(samples) // 2]
+            end.record(root)
+            end.synchronize()
+            host_samples.append((perf_counter_ns() - host_start) / 1e6)
+            samples.append(start.elapsed_time(end))
+    return samples, host_samples
+
+
+def replay_median(graph, root, rounds: int) -> float:
+    from statistics import median
+
+    return median(replay_samples(graph, root, rounds)[0])
 
 
 def join_graph_streams(root: torch.cuda.Stream) -> None:

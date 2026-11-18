@@ -57,10 +57,42 @@ def test_partial_returns_to_one_moe_rank():
     raise AssertionError("a partial with two MoE destinations was accepted")
 
 
+def test_active_rows_pack_into_one_slice():
+    from comm_cp import _active_rows, _contiguous_bounds
+
+    mask = torch.zeros(2, 6, dtype=torch.int32)
+    mask[0] = 1
+    mask[1, :2] = 1
+    src, dst = _active_rows(1, 6, mask, None, None, False)
+    assert _contiguous_bounds(src) == (0, 2)
+    assert _contiguous_bounds(dst) == (0, 2)
+    src, dst = _active_rows(0, 6, mask, None, None, True)
+    assert _contiguous_bounds(src) == (0, 6)
+    assert torch.equal(dst, torch.arange(6))
+    # Partner return reads the moe plane at the same slots.
+    src, dst = _active_rows(1, 6, mask, None, None, True)
+    assert _contiguous_bounds(src) == (6, 2)
+    assert _contiguous_bounds(dst) == (0, 2)
+    slots = torch.tensor([0, 2])
+    partial = torch.zeros(2, 2, dtype=torch.int32)
+    partial[0] = 1
+    src, dst = _active_rows(0, 2, partial, None, slots, False)
+    assert torch.equal(src, torch.tensor([0, 1]))
+    assert torch.equal(dst, slots)
+    assert _contiguous_bounds(dst) is None
+    table = torch.full((2, 3), -1, dtype=torch.long)
+    table[1, 0] = 5
+    table[1, 2] = 1
+    src, dst = _active_rows(1, 3, None, table, None, False)
+    assert torch.equal(src, torch.tensor([0, 2]))
+    assert torch.equal(dst, torch.tensor([5, 1]))
+
+
 def main():
     test_q_fans_out_by_mask()
     test_dst_row_indices_choose_the_slot()
     test_partial_returns_to_one_moe_rank()
+    test_active_rows_pack_into_one_slice()
     print("comm route ok", flush=True)
 
 

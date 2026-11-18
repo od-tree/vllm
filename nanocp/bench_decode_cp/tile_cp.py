@@ -1,58 +1,42 @@
-"""Per-row KV tiles for decode CP.
-
-Same rule as head-TP's tile plan, without the head cut. Each rank still
-holds both KV heads. Long rows share about one wave of CTAs, capped at 16
-and at the number of FA2 KV blocks (64 tokens for head dim 256). Short rows
-stay one CTA per KV head. The plan is host data; the caller uploads it
-before the timed step.
-"""
-
+"""Use the engine's CPU tile planner for each rank's actual paged layout."""
 from __future__ import annotations
 
-KV_HEADS = 2
-KV_TILE = 64
-SPLIT_CAP = 16
+import importlib.util
+import os
+from pathlib import Path
+
+# This benchmark also runs with only the FA2 extension installed.
+def _load_planner():
+    root = Path(os.environ.get("VLLM_ROOT", Path(__file__).resolve().parents[3] / "vllm"))
+    path = root / "vllm/v1/decode_tiles.py"
+    spec = importlib.util.spec_from_file_location("decode_tiles", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def pack_tile(row: int, head: int, split: int) -> int:
-    """Bits 0-15 row, 16-23 KV head, 24-31 split. Same layout as head-TP."""
-
-    if not (0 <= row <= 0xFFFF and 0 <= head <= 0xFF and 0 <= split <= 0xFF):
-        raise ValueError(f"tile ({row}, {head}, {split}) does not fit in one int32")
-    return row | (head << 16) | (split << 24)
+_planner = _load_planner()
+pack_tile = _planner.pack_head_tp_tile
 
 
-def plan_tiles(lengths: list[int], n_long: int, num_sms: int, num_kv_heads: int = KV_HEADS):
-    """Return ``(tiles, row_splits, max_splits)`` for one rank's batch.
+def plan_tiles(lengths, n_long, num_sms, num_kv_heads=2, *, first_head=0, long_heads=None):
+    if not 0 <= n_long <= len(lengths):
+        raise ValueError("invalid number of cooperative rows")
+    count = num_kv_heads if long_heads is None else long_heads
+    ranges = [(row, first_head, first_head + count) for row in range(n_long)]
+    return _planner.plan_decode_tiles(
+        lengths, ranges, list(range(n_long, len(lengths))), num_kv_heads, num_sms,
+    )
 
-    ``lengths`` is the KV this rank holds, long rows first. ``n_long`` of
-    those rows may be split. The rest are short and get one split.
-    """
 
-    n = len(lengths)
-    n_long = max(0, min(n_long, n))
-    if num_sms <= 0 or num_kv_heads <= 0 or n == 0:
-        return [pack_tile(0, 0, 0)], [1], 1
-    row_splits = [1] * n
-    if n_long and n_long * num_kv_heads < num_sms:
-        total = sum(max(lengths[index], 1) for index in range(n_long))
-        for index in range(n_long):
-            seq = max(lengths[index], 1)
-            raw = (num_sms * seq) // (total * num_kv_heads)
-            n_blocks = max(1, (seq + KV_TILE - 1) // KV_TILE)
-            row_splits[index] = min(SPLIT_CAP, n_blocks, max(1, raw))
-    tiles: list[int] = []
-    for row in range(n_long):
-        for split in range(row_splits[row]):
-            for head in range(num_kv_heads):
-                tiles.append(pack_tile(row, head, split))
-    for row in range(n_long, n):
-        for head in range(num_kv_heads):
-            tiles.append(pack_tile(row, head, 0))
-    if not tiles:
-        tiles.append(pack_tile(0, 0, 0))
-        row_splits[0] = 1
-    return tiles, row_splits, max(row_splits)
+def device_tiles(lengths, n_long, first_head, num_sms, device, *, long_heads=1):
+    import torch
+
+    tiles, splits, maximum = plan_tiles(
+        lengths, n_long, num_sms, first_head=first_head, long_heads=long_heads,
+    )
+    return (torch.tensor(tiles, dtype=torch.int32, device=device),
+            torch.tensor(splits, dtype=torch.int8, device=device), maximum)
 
 
 def segment_tiles(segment):
@@ -70,11 +54,6 @@ def segment_tiles(segment):
     if cached is not None and cached[0].device == device:
         return cached
     num_sms = torch.cuda.get_device_properties(device).multi_processor_count
-    tiles, splits, max_splits = plan_tiles(segment.lengths, segment.n_long, num_sms)
-    uploaded = (
-        torch.tensor(tiles, dtype=torch.int32, device=device),
-        torch.tensor(splits, dtype=torch.int8, device=device),
-        max_splits,
-    )
+    uploaded = device_tiles(segment.lengths, segment.n_long, 0, num_sms, device, long_heads=2)
     segment._tiles = uploaded
     return uploaded

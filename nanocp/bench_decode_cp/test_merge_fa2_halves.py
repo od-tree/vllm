@@ -31,8 +31,7 @@ def _check(seqs, n_long, num_splits=0):
         f"max_abs {float(err.max()):.6e}",
         flush=True,
     )
-    if float(err.max()) > MAX_ABS:
-        raise SystemExit(f"merge differs from full FA2 by {float(err.max()):.3e}")
+    torch.testing.assert_close(merged.float(), ref.float(), atol=MAX_ABS, rtol=0)
     torch.cuda.synchronize()
 
 

@@ -6,17 +6,19 @@ from tile_cp import plan_tiles
 def test_long_rows_share_the_sms_and_shorts_stay_one():
     lengths = [131072, 131072] + [512] * 32
     tiles, splits, max_splits = plan_tiles(lengths, n_long=2, num_sms=108)
-    assert splits[:2] == [16, 16]
+    # Short rows already hold some of the wave. The two long rows get 25
+    # splits each: 2 rows * 25 * 2 heads = 100 CTAs, their share of 108 SMs.
+    assert splits[:2] == [25, 25]
     assert splits[2:] == [1] * 32
-    assert max_splits == 16
-    assert len(tiles) == 2 * 16 * 2 + 32 * 2
+    assert max_splits == 25
+    assert len(tiles) == 2 * 25 * 2 + 32 * 2
 
 
-def test_a_full_batch_of_long_rows_is_not_split_further():
+def test_saturated_batch_uses_the_engine_tail_wave_policy():
     lengths = [32768] * 128
     _tiles, splits, max_splits = plan_tiles(lengths, n_long=128, num_sms=108)
-    assert splits == [1] * 128
-    assert max_splits == 1
+    assert splits == [8] * 128
+    assert max_splits == 8
 
 
 def test_split_stops_at_the_kv_blocks():
@@ -26,7 +28,7 @@ def test_split_stops_at_the_kv_blocks():
 
 def main():
     test_long_rows_share_the_sms_and_shorts_stay_one()
-    test_a_full_batch_of_long_rows_is_not_split_further()
+    test_saturated_batch_uses_the_engine_tail_wave_policy()
     test_split_stops_at_the_kv_blocks()
     print("tile plan ok")
 
