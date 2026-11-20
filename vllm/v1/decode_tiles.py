@@ -3,6 +3,7 @@
 HEAD_TP_SPLIT_CAP = 16
 # row_splits is int8 and the FA2 combine is compiled up to 128 partials.
 HEAD_TP_SPLIT_LIMIT = 127
+FA3_EXPLICIT_SPLIT_LIMIT = 128
 
 
 def flash_attn_split_kv_block_tokens(head_size: int) -> int:
@@ -151,3 +152,57 @@ def plan_decode_tiles(
         for head in range(num_kv_heads):
             tiles.append(pack_head_tp_tile(index, head, 0))
     return tiles, row_splits, max(row_splits)
+
+
+def minimax_split_counts(
+    kv_blocks: list[int], kv_heads: list[int], cta_budget: int, split_limit: int,
+) -> tuple[int, ...]:
+    """Minimize the largest KV chunk under a budget of packed-GQA work tiles.
+
+    Each split for a row costs one tile per local KV head. For a proposed
+    maximum chunk of t blocks, ceil(blocks / t) is the least number of
+    splits that can meet it. This gives a monotone feasibility test.
+    """
+    if len(kv_blocks) != len(kv_heads) or any(
+        blocks < 1 or heads < 1 for blocks, heads in zip(kv_blocks, kv_heads)
+    ):
+        raise ValueError("each decode row needs a positive block and head count")
+    if cta_budget < sum(kv_heads) or not 1 <= split_limit <= FA3_EXPLICIT_SPLIT_LIMIT:
+        raise ValueError("invalid work tile budget or split limit")
+    if not kv_blocks:
+        return ()
+
+    lo = (max(kv_blocks) + split_limit - 1) // split_limit
+    hi = max(kv_blocks)
+    while lo < hi:
+        chunk = (lo + hi) // 2
+        needed = sum(
+            heads * ((blocks + chunk - 1) // chunk)
+            for blocks, heads in zip(kv_blocks, kv_heads)
+        )
+        if needed <= cta_budget:
+            hi = chunk
+        else:
+            lo = chunk + 1
+    return tuple((blocks + lo - 1) // lo for blocks in kv_blocks)
+
+
+def fa3_split_candidates(
+    kv_blocks: list[int], kv_heads: list[int], num_sms: int, split_limit: int,
+) -> dict[int, tuple[int, ...]]:
+    """Generate distinct plans for a latency sweep, in increasing budget order."""
+    if num_sms <= 0:
+        raise ValueError("the SM count must be positive")
+    # Sweep whole waves for sparse batches and extra work on top of the
+    # unsplit baseline for batches that already occupy several waves.
+    base = sum(kv_heads)
+    budgets = {base, max(base, num_sms), max(base, 2 * num_sms)}
+    budgets.update(base + extra for extra in (max(1, num_sms // 2), num_sms, 2 * num_sms))
+    candidates = {}
+    seen = set()
+    for budget in sorted(budgets):
+        counts = minimax_split_counts(kv_blocks, kv_heads, budget, split_limit)
+        if counts not in seen:
+            candidates[budget] = counts
+            seen.add(counts)
+    return candidates

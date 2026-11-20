@@ -216,6 +216,7 @@ def flash_attn_varlen_func(
     dynamic_causal: "torch.Tensor | None" = None,
     gather_kv_indices=None,
     gather_kv_valid_length=None,
+    row_split_counts: "torch.Tensor | None" = None,
 ):
     """dropout_p should be set to 0.0 during evaluation
     Supports multi-query and grouped-query attention (MQA/GQA) by passing in K, V with fewer heads
@@ -295,6 +296,10 @@ def flash_attn_varlen_func(
         gather_kv_indices: (total_q, k) int32 KV rows per query token, `-1` padded,
             k a multiple of 128. Requires q_v, excludes block_table. FA4 only.
         gather_kv_valid_length: (total_q,) int32, real entries per row. FA4 only.
+        row_split_counts: (batch_size,) int32 tensor on the query device.
+            For single-token paged FA3 with explicit num_splits in [1, 128].
+            The scheduler clips counts to the bound and removes empty splits.
+            Excludes scheduler_metadata.
 
     Return:
         out: (total, nheads, headdim).
@@ -320,6 +325,8 @@ def flash_attn_varlen_func(
     assert fa_version == 4 or (
         gather_kv_indices is None and gather_kv_valid_length is None
     ), f"gather_kv_* is only supported by FA4, got fa_version={fa_version}"
+    if row_split_counts is not None and fa_version != 3:
+        raise ValueError("row_split_counts requires FA3")
 
     if softmax_scale is None:
         softmax_scale = q.shape[-1] ** (-0.5)
@@ -423,6 +430,7 @@ def flash_attn_varlen_func(
             cp_world_size,
             cp_rank,
             cp_tot_seqused_k,
+            **({"row_split_counts": row_split_counts} if row_split_counts is not None else {}),
         )
     elif fa_version == 4:
         assert alibi_slopes is None, "Alibi is not supported in FA4"
