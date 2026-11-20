@@ -15,6 +15,22 @@ def tokens(batch, tensor, row):
 
 
 class TestWorkload(unittest.TestCase):
+    def test_asymmetric_cp_preserves_paged_kv_and_partner_batch(self):
+        full = full_batch((101, 256, 17), 11)
+        background = full_batch((33,), 29)
+        for share, prefixes in ((75, [64, 192]), (90, [80, 224])):
+            with self.subTest(owner_percent=share):
+                master, partner, _ = cp_segments(full, 2, background, owner_percent=share)
+                self.assertEqual(master.lengths, prefixes + [17])
+                self.assertEqual(partner.lengths, [101 - prefixes[0], 256 - prefixes[1], 33])
+                for field in ("k", "v"):
+                    for row in range(2):
+                        combined = torch.cat((tokens(master, getattr(master, field), row),
+                                              tokens(partner, getattr(partner, field), row)))
+                        self.assertTrue(torch.equal(combined, tokens(full, getattr(full, field), row)))
+                    self.assertTrue(torch.equal(tokens(partner, getattr(partner, field), 2),
+                                                tokens(background, getattr(background, field), 0)))
+
     def test_partner_background_and_long_prefix_survive_packing(self):
         case = QUICK[-1]
         full = full_batch(case.owner, 11)

@@ -101,7 +101,7 @@ def _select_segment(segment: SegmentBatch, slots: torch.Tensor, full_batch: int)
 def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch.Tensor,
                num_splits: int = 0, max_ks: list[int] | None = None,
                comm: CpComm | None = None, sync: bool = True, marks: dict | None = None,
-               local_outputs=None, mark=lambda name: None, context_lens=None):
+               local_outputs=None, mark=lambda name: None, context_lens=None, use_custom_tiles=True):
     """One decode step. KV already lives on each rank. Q, O, and LSE are routed.
 
     ``segments[r]`` is rank ``r``'s compacted pages, on ``devices[r]``. A
@@ -155,7 +155,8 @@ def run_routed(segments: list[SegmentBatch], moe_rank: int, devices, mask: torch
             segment.offsets[offsets_key] = decode_offsets(rows, q_rank.device)
         out, lse = attn_local(
             q_rank, k, v, table, used, num_splits=num_splits, max_seqlen_k=max_k,
-            tile_plan=segment_tiles(segment) if num_splits < 1 and rows == len(segment.lengths) else None,
+            tile_plan=(segment_tiles(segment) if use_custom_tiles and num_splits < 1
+                       and rows == len(segment.lengths) else None),
             offsets=segment.offsets[offsets_key],
             may_have_empty_rows=not segment.lengths or 0 in segment.lengths,
         )

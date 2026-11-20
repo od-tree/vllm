@@ -17,19 +17,21 @@ DIM = 256
 DTYPE = torch.bfloat16
 
 
-def page_split(seq: int) -> tuple[int, int]:
-    """Split on a page boundary. The prefix is the largest multiple of 16 not above ``seq // 2``."""
-    left = (seq // 2 // BLOCK) * BLOCK
+def page_split(seq: int, owner_percent: int = 50) -> tuple[int, int]:
+    """Round the requested owner share down to a page boundary."""
+    if not 0 < owner_percent < 100:
+        raise ValueError("a cooperative split requires an owner share between 0 and 100")
+    left = (seq * owner_percent // (100 * BLOCK)) * BLOCK
     return left, seq - left
 
 
-def segment_limits(seqs: list[int], n_long: int) -> tuple[list[int], list[int]]:
+def segment_limits(seqs: list[int], n_long: int, owner_percent: int = 50) -> tuple[list[int], list[int]]:
     """CPU lengths for the master batch (long prefixes, then short full rows) and the partner suffixes."""
     master = []
     partner = []
     for row, seq in enumerate(seqs):
-        left, right = page_split(seq)
         if row < n_long:
+            left, right = page_split(seq, owner_percent)
             master.append(left)
             partner.append(right)
         else:
@@ -48,14 +50,15 @@ def _slice_pages(cache: torch.Tensor, table_row: torch.Tensor, start: int, lengt
     return cache.index_select(0, ids)
 
 
-def make_full_cache(seqs: list[int], device, seed: int = 11):
+def make_full_cache(seqs: list[int], device, seed: int = 11, *, shape=(Q, KV, DIM)):
+    q_heads, kv_heads, head_dim = shape
     counts = [(seq + BLOCK - 1) // BLOCK for seq in seqs]
     total = sum(counts)
     gen = torch.Generator(device=device)
     gen.manual_seed(seed)
-    k = torch.randn(total, BLOCK, KV, DIM, dtype=DTYPE, device=device, generator=gen)
-    v = torch.randn(total, BLOCK, KV, DIM, dtype=DTYPE, device=device, generator=gen)
-    q = torch.randn(len(seqs), Q, DIM, dtype=DTYPE, device=device, generator=gen)
+    k = torch.randn(total, BLOCK, kv_heads, head_dim, dtype=DTYPE, device=device, generator=gen)
+    v = torch.randn(total, BLOCK, kv_heads, head_dim, dtype=DTYPE, device=device, generator=gen)
+    q = torch.randn(len(seqs), q_heads, head_dim, dtype=DTYPE, device=device, generator=gen)
     table = torch.zeros(len(seqs), max(counts) if counts else 1, dtype=torch.int32, device=device)
     cursor = 0
     for row, count in enumerate(counts):
@@ -114,13 +117,13 @@ def relocate_kv(segment: SegmentBatch, device) -> SegmentBatch:
     return result
 
 
-def full_batch(lengths, seed, device="cpu"):
-    return SegmentBatch(*make_full_cache(lengths, device, seed), "full", lengths)
+def full_batch(lengths, seed, device="cpu", *, shape=(Q, KV, DIM)):
+    return SegmentBatch(*make_full_cache(lengths, device, seed, shape=shape), "full", lengths)
 
 
-def _pack_rows(full, n_long, which, local=None):
+def _pack_rows(full, n_long, which, local=None, *, owner_percent=50):
     """Pack CP segments and optional partner-owned rows into one FA batch."""
-    lengths, suffixes = segment_limits(full.lengths, n_long)
+    lengths, suffixes = segment_limits(full.lengths, n_long, owner_percent)
     master = which == "master"
     local_lengths = lengths if master else suffixes
     offsets = [0] * len(lengths) if master else lengths[:n_long]
@@ -154,11 +157,11 @@ def _pack_rows(full, n_long, which, local=None):
     return segment
 
 
-def cp_segments(full, n_long, partner_local=None):
+def cp_segments(full, n_long, partner_local=None, *, owner_percent=50):
     if not 0 <= n_long <= len(full.lengths):
         raise ValueError("invalid number of cooperative rows")
-    master = _pack_rows(full, n_long, "master")
-    partner = _pack_rows(full, n_long, "partner", partner_local)
+    master = _pack_rows(full, n_long, "master", owner_percent=owner_percent)
+    partner = _pack_rows(full, n_long, "partner", partner_local, owner_percent=owner_percent)
     mask = torch.zeros(2, len(full.lengths), dtype=torch.int32)
     mask[0] = 1
     mask[1, :n_long] = 1
