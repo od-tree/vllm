@@ -1546,9 +1546,18 @@ class TimedTrace(BenchmarkDataset):
                     f"Use --label-output-length to specify the correct "
                     f"field name."
                 )
-            prompt_ids = self._expand_prompt(
-                entry.get(self.label_hash_ids, []), input_length, tokenizer
-            )
+            if "prompt_token_ids" in entry:
+                prompt_ids = entry["prompt_token_ids"]
+                if (
+                    not isinstance(prompt_ids, list)
+                    or len(prompt_ids) != input_length
+                    or any(type(token) is not int or token < 0 for token in prompt_ids)
+                ):
+                    raise ValueError(f"Invalid explicit prompt_token_ids in trace row {ind}")
+            else:
+                prompt_ids = self._expand_prompt(
+                    entry.get(self.label_hash_ids, []), input_length, tokenizer
+                )
 
             # Get timestamp with proper error handling
             ts_value = entry.get(self.label_ts)

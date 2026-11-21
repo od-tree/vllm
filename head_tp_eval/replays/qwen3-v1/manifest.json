@@ -1,0 +1,52 @@
+{
+  "format": "headtp-qwen3-v1",
+  "seed": 20261122,
+  "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+  "model_revision": "61c2ee12e2e018cd6cdcaa3713e6ffd19e7b8086",
+  "source_revision": "8abce29fe3ba0af3cd785b5e533b5b4b22ae70d5",
+  "max_context": 262144,
+  "poisson_requests_per_second": 1,
+  "prompts": "SHAKE256(ascii(headtp-qwen3-v1/seed/zero_based_row)), little-endian uint16",
+  "workloads": {
+    "short": {
+      "source": "sharegpt4o-mixed-random-60k.csv",
+      "source_sha256": "f30327e86d8977923de7063efe640062716fa359acdbccf206e9928de1356c39",
+      "sha256": "f659dafe94d6340574e7180f3abcc323826dc1fe1204f46eccea336bdb500e58",
+      "prompt_bytes_sha256": "b24b02a901688fb1a2f718de8d5ebe30951e57c566673b5ed4926bf901f59d51",
+      "requests": 60000,
+      "long": 0,
+      "clipped": 0,
+      "input_tokens": 36625694
+    },
+    "issue01": {
+      "source": "sharegpt4o-random_geminiissue_r0.01_n60000_60k.csv",
+      "source_sha256": "6e319608aaaca20656e838812b1188f966e77524c7f56da5feb20661bfdc216b",
+      "sha256": "e9c8c8c1962c8633975c73d99c3bbdb5ceb25f0d38e700188a1010213b1b1fcd",
+      "prompt_bytes_sha256": "8e15002c8261ea4a3a97c14c6f8767572af20785c5e3f1928cb9c1dc7d173a67",
+      "requests": 60000,
+      "long": 600,
+      "clipped": 406,
+      "input_tokens": 179076723
+    },
+    "issue05": {
+      "source": "sharegpt4o-random_geminiissue_r0.05_n60000_60k.csv",
+      "source_sha256": "6ea91e1bb2e93ce0afea000f1ea173e49180411cfd7b60d24c5050422be02cef",
+      "sha256": "f84ce549f611e5d8bc394bf710cf721dca22e0ef98d7e31b8b54bc884725712e",
+      "prompt_bytes_sha256": "3e2ec2d3ea1eb2a3c510d38df725a1a1acdde0255ea2e48256964a3a7659cc96",
+      "requests": 60000,
+      "long": 3000,
+      "clipped": 2107,
+      "input_tokens": 752283031
+    },
+    "issue_pool": {
+      "source": "Gemini_Issues_Stats_rename-shuffle.csv",
+      "source_sha256": "c51aac4299ec45e906d36659178de113f894a29c4dc7e2a7c7db3a855678e6b7",
+      "sha256": "611b8f44dce7285a334a616c03d33682e907e0c25162e131dbd4ae08a47f4768",
+      "prompt_bytes_sha256": "fa6fb860b334ce52925ea0d59452f3dfe7adc3adc1cafae653348e3217779ba8",
+      "requests": 2776,
+      "long": 2776,
+      "clipped": 1946,
+      "input_tokens": 663468099
+    }
+  }
+}
