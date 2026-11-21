@@ -1,0 +1,58 @@
+{
+  "format": "headtp-qwen3-v1",
+  "seed": 20261122,
+  "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+  "model_revision": "61c2ee12e2e018cd6cdcaa3713e6ffd19e7b8086",
+  "source_revision": "8abce29fe3ba0af3cd785b5e533b5b4b22ae70d5",
+  "max_context": null,
+  "poisson_requests_per_second": 1,
+  "prompts": "SHAKE256(ascii(headtp-qwen3-v1/seed/zero_based_row)), little-endian uint16",
+  "workloads": {
+    "short": {
+      "source": "sharegpt4o-mixed-random-60k.csv",
+      "source_sha256": "f30327e86d8977923de7063efe640062716fa359acdbccf206e9928de1356c39",
+      "sha256": "f659dafe94d6340574e7180f3abcc323826dc1fe1204f46eccea336bdb500e58",
+      "prompt_bytes_sha256": "b24b02a901688fb1a2f718de8d5ebe30951e57c566673b5ed4926bf901f59d51",
+      "requests": 60000,
+      "long": 0,
+      "clipped": 0,
+      "input_tokens": 36625694,
+      "required_context": 12893
+    },
+    "issue01": {
+      "source": "sharegpt4o-random_geminiissue_r0.01_n60000_60k.csv",
+      "source_sha256": "6e319608aaaca20656e838812b1188f966e77524c7f56da5feb20661bfdc216b",
+      "sha256": "a6e7402d759ee4416005b4feb9bbb49798a07622a10ec9425584d8b2ff0f1168",
+      "prompt_bytes_sha256": "6b3aa3d4033a933d272963941c96312d2e60331a4866d005ecf4736a5a5527a5",
+      "requests": 60000,
+      "long": 600,
+      "clipped": 0,
+      "input_tokens": 294520561,
+      "required_context": 996462
+    },
+    "issue05": {
+      "source": "sharegpt4o-random_geminiissue_r0.05_n60000_60k.csv",
+      "source_sha256": "6ea91e1bb2e93ce0afea000f1ea173e49180411cfd7b60d24c5050422be02cef",
+      "sha256": "ffb1c265bfa69fdc554ca5bc9d4f3b53653920e142158349d642e6813960ca02",
+      "prompt_bytes_sha256": "3b497dd1a0de17554eb60cddf0ae8702ccc73ff3f6db1026ffa1d5a9cf7fc692",
+      "requests": 60000,
+      "long": 3000,
+      "clipped": 0,
+      "input_tokens": 1373397926,
+      "required_context": 996596
+    },
+    "issue_pool": {
+      "source": "Gemini_Issues_Stats_rename-shuffle.csv",
+      "source_sha256": "c51aac4299ec45e906d36659178de113f894a29c4dc7e2a7c7db3a855678e6b7",
+      "sha256": "2b4880fff51ecdcf675b4d532d551833553c0c90ac21302f19ee3cbd73efd7a4",
+      "prompt_bytes_sha256": "ba221ac5cdfc7dd9f2e2189a2d1e91faf788a21e1e5c6deb99e13d1d1dd47ba8",
+      "requests": 2776,
+      "long": 2776,
+      "clipped": 0,
+      "input_tokens": 1214092184,
+      "required_context": 996596
+    }
+  },
+  "profile": "original",
+  "required_context": 996596
+}

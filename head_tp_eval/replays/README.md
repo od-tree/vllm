@@ -1,4 +1,29 @@
-# Qwen3 decode replay v1
+# Qwen3 decode replays
+
+## Original NanoCP lengths
+
+`qwen3-original-v1/` retains the source prompt and output lengths for every
+request. The manifest gives the minimum total context needed by each workload.
+Across all four files the longest prompt plus output is 996,596 tokens.
+Provision the model's context extension and sufficient KV capacity on each
+tested server before running those windows.
+
+From the vLLM checkout:
+
+```sh
+python head_tp_eval/frozen_replay.py freeze --original-lengths
+python head_tp_eval/frozen_replay.py export issue05 \
+  --bundle head_tp_eval/replays/qwen3-original-v1 --start 0 --count 16 \
+  --output head_tp_eval/results/qwen3-original-v1/issue05-first16.jsonl
+```
+
+The two profiles share the row keys, arrival times, output budgets, routing
+overlay and synthetic prompt stream. A previously clipped row expands by
+extending its original token prefix. GPU count and DP rank assignment are
+deployment parameters. The model ID in the manifest identifies the token
+vocabulary used to freeze the input.
+
+## 256K profile
 
 The four compact traces in `qwen3-v1/` preserve every source row in order.
 `short`, `issue01`, and `issue05` are the three 60,000-request evaluation

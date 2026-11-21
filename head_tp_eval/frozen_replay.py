@@ -15,6 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEFAULT = HERE / "replays" / "qwen3-v1"
+ORIGINAL = HERE / "replays" / "qwen3-original-v1"
 SOURCES = {
     "short": "sharegpt4o-mixed-random-60k.csv",
     "issue01": "sharegpt4o-random_geminiissue_r0.01_n60000_60k.csv",
@@ -46,7 +47,8 @@ def compressed_writer(path):
         yield csv.writer(stream, lineterminator="\n")
 
 
-def freeze(source, dest):
+def freeze(source, dest, *, original_lengths=False):
+    context_limit = None if original_lengths else CONTEXT
     dest.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=dest.parent) as tmp:
         root = Path(tmp) / "bundle"
@@ -57,12 +59,17 @@ def freeze(source, dest):
             "model": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
             "model_revision": "61c2ee12e2e018cd6cdcaa3713e6ffd19e7b8086",
             "source_revision": SOURCE_REV,
-            "max_context": CONTEXT,
+            "max_context": context_limit,
             "poisson_requests_per_second": 1,
-            "prompts": ("SHAKE256(ascii(headtp-qwen3-v1/seed/zero_based_row)), "
-                        "little-endian uint16"),
+            "prompts": (
+                "SHAKE256(ascii(headtp-qwen3-v1/seed/zero_based_row)), "
+                "little-endian uint16"
+            ),
             "workloads": {},
         }
+        if original_lengths:
+            manifest["profile"] = "original"
+            manifest["required_context"] = 0
         for name, filename in SOURCES.items():
             original = subprocess.check_output(
                 [
@@ -81,7 +88,7 @@ def freeze(source, dest):
             digest = hashlib.sha256()
             rng = random.Random(SEED)
             seconds = 0.0
-            count = clipped = longs = tokens = 0
+            count = clipped = longs = tokens = required_context = 0
             with (
                 (source / filename).open(newline="") as f,
                 compressed_writer(path) as writer,
@@ -98,9 +105,16 @@ def freeze(source, dest):
                 )
                 for i, row in enumerate(csv.DictReader(f)):
                     raw, out = int(row["prompt_len"]), int(row["output_len"])
-                    if raw <= 0 or not 0 < out < CONTEXT:
+                    if (
+                        raw <= 0
+                        or out <= 0
+                        or (context_limit is not None and out >= context_limit)
+                    ):
                         raise ValueError((filename, i, raw, out))
-                    length = min(raw, CONTEXT - out)
+                    length = (
+                        raw if context_limit is None else min(raw, context_limit - out)
+                    )
+                    required_context = max(required_context, length + out)
                     kind = "long" if row.get("type") in ("issue", "long") else "short"
                     if i:
                         seconds += rng.expovariate(1)
@@ -120,6 +134,11 @@ def freeze(source, dest):
                 clipped=clipped,
                 input_tokens=tokens,
             )
+            if original_lengths:
+                manifest["workloads"][name]["required_context"] = required_context
+                manifest["required_context"] = max(
+                    manifest["required_context"], required_context
+                )
         (root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         if dest.exists():
             if any(
@@ -188,7 +207,12 @@ def main():
     build.add_argument(
         "--source", type=Path, default=HERE.parents[1] / "NanoEngine/ae_scripts/dataset"
     )
-    build.add_argument("--dest", type=Path, default=DEFAULT)
+    build.add_argument("--dest", type=Path)
+    build.add_argument(
+        "--original-lengths",
+        action="store_true",
+        help="Keep every source prompt and output length.",
+    )
     cut = subs.add_parser("export")
     cut.add_argument("workload", choices=SOURCES)
     cut.add_argument("--bundle", type=Path, default=DEFAULT)
@@ -198,7 +222,8 @@ def main():
     cut.add_argument("--two-rank-overlay", type=Path)
     args = parser.parse_args()
     if args.action == "freeze":
-        freeze(args.source, args.dest)
+        dest = args.dest or (ORIGINAL if args.original_lengths else DEFAULT)
+        freeze(args.source, dest, original_lengths=args.original_lengths)
     else:
         export(
             args.bundle,
