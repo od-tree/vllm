@@ -1,13 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Two-worker head-sharded GQA for single-token Qwen3 MoE decode.
 
-The owner always stores the full KV for its requests. A worker leases part of
-the regular block pool for its peer's upper KV heads. Virtual FA rows address
-one physical KV head each, including ordinary local requests.
+Cooperating ranks each store only their local KV heads in regular pool pages.
+Virtual FA rows address one head each, including ordinary local requests.
 """
 
-from collections.abc import Sequence
-from dataclasses import dataclass
 from numbers import Integral
 
 import torch
@@ -15,53 +12,10 @@ import torch.distributed as dist
 
 from vllm.logger import init_logger
 from vllm.utils.math_utils import cdiv
-from vllm.v1.decode_tiles import minimax_split_counts
+from vllm.v1.head_tp import DecodePolicy as DecodePolicy
+from vllm.v1.head_tp import DecodeRow as DecodeRow
 
 logger = init_logger(__name__)
-
-
-@dataclass(frozen=True)
-class DecodeRow:
-    req_id: str
-    position: int  # number of valid prior KV tokens
-
-
-class DecodePolicy:
-    """Called outside capture on every decode step. None keeps all rows local."""
-
-    def __init__(self, options):
-        self.threshold = int(options.get("min_context", 0))
-        self.tile = options.get("tile", "minimax")
-        if self.tile not in ("minimax", "one"):
-            raise ValueError("head_tp.tile must be minimax or one")
-
-    def select(
-        self,
-        rows: Sequence[DecodeRow],
-        *,
-        peer_positions: Sequence[int],
-        rank: int,
-        step: int,
-    ) -> str | None:
-        candidates = (r for r in rows if r.position >= self.threshold)
-        row = max(candidates, key=lambda r: r.position, default=None)
-        return row.req_id if row else None
-
-    def splits(
-        self,
-        lengths: list[int],
-        heads: list[int],
-        *,
-        block_n: int,
-        sms: int,
-        limit: int,
-        rank: int,
-        step: int,
-    ) -> Sequence[int]:
-        if self.tile == "one":
-            return [1] * len(lengths)
-        blocks = [max(1, cdiv(n, block_n)) for n in lengths]
-        return minimax_split_counts(blocks, heads, max(sum(heads), sms), limit)
 
 
 class HeadTPDecode:
@@ -154,8 +108,7 @@ class HeadTPDecode:
         self.device = caches[0].device
         self.rank = rank
         self.max_len = max_len
-        self.capacity = min(max_len, capacity)
-        if self.capacity < 1:
+        if capacity < 1:
             raise ValueError("head_tp.max_context must be positive")
         self.fa_version = (
             3 if torch.cuda.get_device_capability(self.device)[0] == 9 else 2
@@ -167,8 +120,10 @@ class HeadTPDecode:
         self.sms = torch.cuda.get_device_properties(self.device).multi_processor_count
         self.enabled = False
         self.step = 0
-        self.previous = None
-        self.reserved = None
+        self.resident = [None, None]
+        self.physical = [[], []]
+        self.address = [None, None]
+        self.mixed = False
         self.group = device_group
         self.cpu_group = cpu_group
         self.columns = cdiv(self.max_len, self.block)
@@ -185,72 +140,154 @@ class HeadTPDecode:
             self.half, dtype=torch.long, device=self.device
         )
         self.offset = torch.zeros(1, dtype=torch.long, device=self.device)
+        self.owner_pages = self.remote_pages.clone()
+        self.owner_offset = self.offset.clone()
+        self.has_owner = torch.zeros(1, dtype=torch.bool, device=self.device)
+        self.write_mask = self.local_mask
         self.incoming = torch.zeros(1, dtype=torch.bool, device=self.device)
         self.head_ids = torch.arange(self.h, device=self.device, dtype=torch.int32)
 
-    def set_pages(self, block_ids):
-        pages = torch.tensor(block_ids, dtype=torch.int32, device=self.device)
-        # Pack two logical half-head pages into each allocator block.
-        self.reserved = (pages[:, None] * self.h + self.head_ids).reshape(-1, self.half)
+    def change_layout(self, action, owner, req_id, packed, dense, position):
+        """Acknowledge migration before the allocator recycles source pages."""
+        old = self.physical[owner]
+        if action in ("pack", "unpack") and position:
+            # A physical page owns 2 consecutive logical blocks per local head.
+            # Read the whole chunk before writing because unpack can reuse the
+            # same physical IDs for the even logical blocks.
+            count = cdiv(position, self.block)
+            ids = packed if action == "pack" else old
+            chunk = max(
+                1,
+                (4 << 20)
+                // (self.h * self.block * 2 * self.d * self.caches[0].element_size()),
+            )
+            for begin in range(0, cdiv(count, 2), chunk):
+                end = min(begin + chunk, cdiv(count, 2))
+                logical_end = min(2 * end, count)
+                n = logical_end - 2 * begin
+                page_ids = torch.tensor(
+                    ids[begin:end], device=self.device, dtype=torch.long
+                )
+                if self.rank == owner:
+                    dense_ids = torch.tensor(
+                        dense[2 * begin : logical_end],
+                        device=self.device,
+                        dtype=torch.long,
+                    )
+                for cache in self.caches:
+                    if action == "pack":
+                        if self.rank == owner:
+                            full = cache.index_select(0, dense_ids)
+                            upper = full[:, self.half :].contiguous()
+                            local = full[:, : self.half]
+                        else:
+                            upper = cache.new_empty(
+                                n, self.half, self.block, 2 * self.d
+                            )
+                            local = upper
+                        dist.broadcast(upper, group=self.group, group_src=owner)
+                        chunks = cache.new_zeros(
+                            2 * (end - begin), self.half, self.block, 2 * self.d
+                        )
+                        chunks[:n].copy_(local)
+                        packed_kv = chunks.view(
+                            end - begin, 2, self.half, self.block, 2 * self.d
+                        ).transpose(1, 2)
+                        cache.index_copy_(
+                            0,
+                            page_ids,
+                            packed_kv.reshape(
+                                end - begin, self.h, self.block, 2 * self.d
+                            ),
+                        )
+                    else:
+                        chunks = cache.index_select(0, page_ids).view(
+                            end - begin, self.half, 2, self.block, 2 * self.d
+                        )
+                        local = chunks.transpose(1, 2).reshape(
+                            -1, self.half, self.block, 2 * self.d
+                        )[:n]
+                        upper = (
+                            torch.empty_like(
+                                local, memory_format=torch.contiguous_format
+                            )
+                            if owner == self.rank
+                            else local.contiguous()
+                        )
+                        dist.broadcast(upper, group=self.group, group_src=1 - owner)
+                        if owner == self.rank:
+                            cache.index_copy_(
+                                0, dense_ids, torch.cat((local, upper), dim=1)
+                            )
+        leaving = action in ("drop", "unpack")
+        self.resident[owner] = None if leaving else req_id
+        self.physical[owner] = [] if leaving else packed
+        self.address[owner] = self.packed_table(self.physical[owner])
 
-    def stage(self, rows, seq_lens, b, table, new_requests):
-        """Agree on both routes before touching caches or replaying any graph."""
+    def packed_table(self, ids):
+        physical = torch.tensor(ids, dtype=torch.int32, device=self.device)
+        # slot = physical_page * H + 2 * local_head + logical_block % 2
+        return (
+            physical[:, None, None] * self.h
+            + self.head_ids[:2][None, :, None]
+            + 2 * self.head_ids[None, None, : self.half]
+        ).reshape(-1, self.half)
+
+    def stage(self, rows, seq_lens, b, table, *, counts=None, mixed=False):
         self.step += 1
-        eligible = [
-            r for r in rows if self.reserved is not None and r.position < self.capacity
-        ]
-        positions = [None, None]
-        dist.all_gather_object(
-            positions, tuple(r.position for r in rows), group=self.cpu_group
+        peer = 1 - self.rank
+        idx = next(
+            (i for i, r in enumerate(rows) if r.req_id == self.resident[self.rank]),
+            None,
         )
-        selected = self.policy.select(
-            eligible,
-            peer_positions=positions[1 - self.rank],
-            rank=self.rank,
-            step=self.step,
-        )
-        idx = next((i for i, r in enumerate(rows) if r.req_id == selected), None)
-        if selected is not None and (idx is None or rows[idx] not in eligible):
-            raise ValueError("head_tp policy selected an ineligible row")
         pos = rows[idx].position if idx is not None else -1
-        migrate = idx is not None and (
-            self.previous != (selected, pos) or selected in new_requests
-        )
+        counts = [1] * len(rows) if counts is None else counts
+        nq = counts[idx] if idx is not None else 0
         routes = [None, None]
-        dist.all_gather_object(routes, (pos, migrate), group=self.cpu_group)
-        peer_pos = routes[1 - self.rank][0]
-        for owner, (position, copy_prefix) in enumerate(routes):
-            if not copy_prefix or position <= 0:
-                continue
-            self._copy_prefix(owner, position, table, idx)
-        self.previous = (selected, pos + 1) if selected is not None else None
-
-        # The graph reads this stable storage even when the owner or row changes.
+        dist.all_gather_object(routes, (pos, nq), group=self.cpu_group)
+        peer_pos, peer_q = routes[peer]
+        if peer_q and self.resident[peer] is None:
+            raise RuntimeError("peer is using an unallocated head shard")
+        self.mixed = mixed
+        if mixed:
+            self.mixed_args = rows, counts, idx, table, peer_pos, peer_q
+            self.write_mask = torch.zeros(b, dtype=torch.bool, device=self.device)
+            if idx is not None:
+                begin = sum(counts[:idx])
+                self.write_mask[begin : begin + nq] = True
+            return
         self.row.fill_(idx if idx is not None else 0)
         self.local_mask.zero_()
+        self.write_mask = self.local_mask
         local_groups = b * self.h
         mapping = self.table[:local_groups].view(b, self.h, self.columns)
         mapping.zero_()
         local_used = self.used[:local_groups].view(b, self.h)
         local_used.zero_()
         if rows:
-            n = len(rows)
             width = min(table.shape[1], self.columns)
-            mapping[:n, :, :width].copy_(
-                table[:n, None, :width] * self.h + self.head_ids[None, :, None]
+            mapping[: len(rows), :, :width].copy_(
+                table[: len(rows), None, :width] * self.h + self.head_ids[None, :, None]
             )
-            local_used[:n].copy_(seq_lens[:n, None])
+            local_used[: len(rows)].copy_(seq_lens[: len(rows), None])
         if idx is not None:
-            self.local_mask[idx] = True
+            n = cdiv(pos + 1, self.block)
+            address = self.address[self.rank]
+            mapping[idx, : self.half, :n].copy_(address[:n].T)
             local_used[idx, self.half :] = 0
-        self.used[local_groups : local_groups + self.half].fill_(peer_pos + 1)
-        self.incoming.fill_(peer_pos >= 0)
-        if peer_pos >= 0:
-            pages = cdiv(peer_pos + 1, self.block)
-            self.table[local_groups : local_groups + self.half, :pages].copy_(
-                self.reserved[:pages].T
-            )
-            self.remote_pages.copy_(self.reserved[peer_pos // self.block])
+            self.local_mask[idx] = True
+            self.owner_pages.copy_(address[pos // self.block])
+            self.owner_offset.fill_(pos % self.block)
+        self.has_owner.fill_(idx is not None)
+        self.used[local_groups : local_groups + self.half].fill_(
+            peer_pos + 1 if peer_q else 0
+        )
+        self.incoming.fill_(bool(peer_q))
+        if peer_q:
+            n = cdiv(peer_pos + 1, self.block)
+            address = self.address[peer]
+            self.table[local_groups : local_groups + self.half, :n].copy_(address[:n].T)
+            self.remote_pages.copy_(address[peer_pos // self.block])
             self.offset.fill_(peer_pos % self.block)
         lengths = [r.position + 1 for r in rows] + [max(1, peer_pos + 1)]
         heads = [self.half if i == idx else self.h for i in range(len(rows))] + [
@@ -266,43 +303,90 @@ class HeadTPDecode:
             step=self.step,
         )
         if len(counts) != len(lengths) or any(
-            not isinstance(s, Integral) or not 1 <= s <= self.limit for s in counts
+            not isinstance(n, Integral) or not 1 <= n <= self.limit for n in counts
         ):
             raise ValueError("head_tp policy returned invalid split counts")
-        splits = [s for s in counts[:-1] for _ in range(self.h)]
+        splits = [n for n in counts[:-1] for _ in range(self.h)]
         splits += [1] * ((b - len(rows)) * self.h) + [counts[-1]] * self.half
         self.splits[: len(splits)].copy_(torch.tensor(splits, dtype=torch.int32))
-        if migrate:
-            logger.info(
-                "head-TP rank %d joined request %s at position %d",
-                self.rank,
-                selected,
-                pos,
-            )
 
-    def _copy_prefix(self, owner, position, table, idx):
-        """Copy compact head pages with bounded temporary device memory."""
-        assert self.reserved is not None
-        n = cdiv(position, self.block)
-        page_bytes = self.half * self.block * 2 * self.d * self.caches[0].element_size()
-        chunk_pages = max(1, (4 << 20) // page_bytes)
-        for start in range(0, n, chunk_pages):
-            end = min(n, start + chunk_pages)
-            if self.rank == owner:
-                source = table[idx, start:end].long()
+    def mixed_forward(self, q, k, v, cache, output, scale):
+        """Chunked causal prefill and mixed batches with bounded Q/K/V exchange."""
+        from vllm.vllm_flash_attn.flash_attn_interface import flash_attn_varlen_func
+
+        rows, counts, idx, table, peer_pos, peer_n = self.mixed_args
+        n = counts[idx] if idx is not None else 0
+        start = sum(counts[:idx]) if idx is not None else 0
+        h, g, d = self.h, self.q_per_k, self.d
+        width = max(n, peer_n, 1)
+        grouped = q.view(-1, h, g, d)
+        packet = q.new_zeros(width, self.half, g + 2, d)
+        if n:
+            sl = slice(start, start + n)
+            packet[:n, :, :g] = grouped[sl, self.half :]
+            packet[:n, :, g] = k[sl, self.half :]
+            packet[:n, :, g + 1] = v[sl, self.half :]
+        remote = self._exchange(packet)
+        pages = cache.view(-1, self.block, 2 * d)
+        key, value = pages.unsqueeze(2).split(d, dim=-1)
+
+        def attend(query, address, pos, kv=None):
+            nq, heads = query.shape[:2]
+            if kv is not None:
+                positions = torch.arange(pos, pos + nq, device=self.device)
+                pages[
+                    address[positions // self.block].long(),
+                    (positions % self.block)[:, None],
+                ] = kv
+            queries = query.transpose(0, 1).reshape(heads * nq, g, d).contiguous()
+            cu = torch.arange(heads + 1, device=self.device, dtype=torch.int32) * nq
+            out = flash_attn_varlen_func(
+                queries,
+                key,
+                value,
+                max_seqlen_q=nq,
+                cu_seqlens_q=cu,
+                max_seqlen_k=pos + nq,
+                seqused_k=torch.full(
+                    (heads,), pos + nq, device=self.device, dtype=torch.int32
+                ),
+                block_table=address[: cdiv(pos + nq, self.block)].T.clone(
+                    memory_format=torch.contiguous_format
+                ),
+                softmax_scale=scale,
+                causal=True,
+                fa_version=self.fa_version,
+            )
+            return out.view(heads, nq, g, d).transpose(0, 1)
+
+        output.zero_()
+        dest = output.view(-1, h, g, d)
+        offset = 0
+        for i, (r, num) in enumerate(zip(rows, counts)):
+            sl = slice(offset, offset + num)
+            if i == idx:
+                dest[sl, : self.half] = attend(
+                    grouped[sl, : self.half],
+                    self.address[self.rank],
+                    r.position,
+                    torch.cat((k[sl, : self.half], v[sl, : self.half]), dim=-1),
+                )
             else:
-                destination = self.reserved[start:end].flatten().long()
-            for cache in self.caches:
-                if self.rank == owner:
-                    payload = cache[source, self.half :].contiguous()
-                else:
-                    payload = cache.new_empty(
-                        end - start, self.half, self.block, 2 * self.d
-                    )
-                dist.broadcast(payload, group=self.group, group_src=owner)
-                if self.rank != owner:
-                    pages = cache.view(-1, self.block, 2 * self.d)
-                    pages.index_copy_(0, destination, payload.flatten(0, 1))
+                addr = table[i, :, None] * h + self.head_ids
+                dest[sl] = attend(grouped[sl], addr, r.position)
+            offset += num
+        returns = q.new_zeros(width, self.half, g, d)
+        if peer_n:
+            returns[:peer_n] = attend(
+                remote[:peer_n, :, :g],
+                self.address[1 - self.rank],
+                peer_pos,
+                remote[:peer_n, :, g:].reshape(peer_n, self.half, 2 * d),
+            )
+        recv = self._exchange(returns)
+        if n:
+            dest[start : start + n, self.half :] = recv[:n]
+        return output
 
     def _exchange(self, data):
         """Both ranks execute the same two NCCL collectives in every layer."""
@@ -313,6 +397,8 @@ class HeadTPDecode:
     def forward(self, q, k, v, cache, output, scale):
         from vllm.vllm_flash_attn.flash_attn_interface import flash_attn_varlen_func
 
+        if self.mixed:
+            return self.mixed_forward(q, k, v, cache, output, scale)
         b = q.shape[0]
         h, half, d, g = self.h, self.half, self.d, self.q_per_k
         grouped = q.view(b, h, g, d)
@@ -326,6 +412,16 @@ class HeadTPDecode:
         )
         remote = self._exchange(packet)
         pages = cache.view(-1, self.block, 2 * d)
+        own = torch.cat(
+            (
+                k.index_select(0, self.row)[0, :half],
+                v.index_select(0, self.row)[0, :half],
+            ),
+            dim=-1,
+        )
+        pages[self.owner_pages, self.owner_offset] = torch.where(
+            self.has_owner, own, pages[self.owner_pages, self.owner_offset]
+        )
         kv = remote[:, g:].reshape(half, 2 * d)
         previous = pages[self.remote_pages, self.offset]
         pages[self.remote_pages, self.offset] = torch.where(self.incoming, kv, previous)

@@ -196,6 +196,10 @@ class KVCacheManager:
                 if isinstance(manager, MambaManager):
                     manager.shared_prefix_checkpoint = True
         self.num_kv_cache_groups = len(kv_cache_config.kv_cache_groups)
+        self.packed_request: str | None = None
+        self.packed_capacity = 0
+        self.packed_growth_reserve = 0
+        self.head_tp_dense_limit = None
         self.block_pool = self.coordinator.block_pool
         self.retained_hit_group_ids = tuple(
             manager.kv_cache_group_id
@@ -250,7 +254,7 @@ class KVCacheManager:
 
     def prefix_cache_lookup_enabled(self, request: Request) -> bool:
         """Whether a local prefix cache lookup may be run for this request."""
-        return self.enable_caching and request.prefix_cache_hit_limit != 0
+        return self.enable_caching and request.request_id != self.packed_request and request.prefix_cache_hit_limit != 0
 
     def record_prefix_cache_stats(self, request: Request, num_hits: int) -> None:
         # Don't count a request that skipped the cache lookup.
@@ -489,6 +493,30 @@ class KVCacheManager:
                 "computed tokens to adopt"
             )
 
+        if (
+            self.head_tp_dense_limit is not None
+            and request.request_id != self.packed_request
+            and request.num_tokens > self.head_tp_dense_limit
+        ):
+            return None
+        if request.request_id == self.packed_request:
+            if num_new_computed_tokens or num_external_computed_tokens:
+                raise ValueError("packed KV cannot adopt full-head prefix blocks")
+            end = min(
+                self.max_model_len,
+                request.num_computed_tokens + num_new_tokens + num_lookahead_tokens,
+            )
+            if end > self.packed_capacity:
+                return None
+            # Preserve the native token-slot table shape. These entries own
+            # zero physical pages; packed attention has its own address table.
+            mgr = self.coordinator.single_type_managers[0]
+            row = mgr.req_to_blocks[request.request_id]
+            added = [self.block_pool.null_block] * max(
+                0, cdiv(end, mgr.block_size) - len(row)
+            )
+            row.extend(added)
+            return self.create_kv_cache_blocks((added,))
         if new_computed_blocks is not None:
             new_computed_block_list = new_computed_blocks.blocks
             if self.retained_hit_group_ids:
@@ -580,7 +608,7 @@ class KVCacheManager:
 
         # Keep `reserved_blocks` free for other in-flight sequences, and an
         # additional watermark of headroom for waiting/preempted admissions.
-        available_blocks = self.block_pool.get_num_free_blocks() - reserved_blocks
+        available_blocks = self.block_pool.get_num_free_blocks() - reserved_blocks - self.packed_growth_reserve
         required_blocks = num_blocks_to_allocate + watermark_blocks
         if required_blocks > available_blocks:
             # Cannot allocate new blocks
@@ -796,7 +824,7 @@ class KVCacheManager:
                 that are already cached and tokens to be cached.
 
         """
-        if self.enable_caching:
+        if self.enable_caching and request.request_id != self.packed_request:
             self.coordinator.cache_blocks(request, num_computed_tokens)
 
     def create_kv_cache_blocks(

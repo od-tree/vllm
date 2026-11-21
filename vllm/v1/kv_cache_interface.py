@@ -645,6 +645,22 @@ class FullAttentionSpec(AttentionSpec):
         dcp_world_size = vllm_config.parallel_config.decode_context_parallel_size
         if self.dcp_sharded and dcp_world_size > 1:
             max_model_len = cdiv(max_model_len, dcp_world_size)
+        # The admission check asks whether one sequence can fit. For a
+        # head-sharded Qwen request each GPU needs one page per 2*B tokens.
+        extra = getattr(vllm_config, "additional_config", None)
+        opts = extra.get("head_tp", {}) if isinstance(extra, dict) else {}
+        if (
+            opts.get("enabled")
+            and vllm_config.parallel_config.data_parallel_size == 2
+            and int(opts.get("max_context", max_model_len)) >= max_model_len
+            and int(opts.get("min_context", 0)) <= max_model_len
+        ):
+            dense_threshold = max(0, int(opts.get("min_context", 0)) - 1)
+            pages = max(
+                cdiv(dense_threshold, self.block_size),
+                cdiv(max_model_len, 2 * self.block_size),
+            )
+            return pages * self.page_size_bytes
         return cdiv(max_model_len, self.block_size) * self.page_size_bytes
 
     @classmethod

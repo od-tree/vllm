@@ -9,12 +9,15 @@ of one request move to other data-parallel ranks for Full Attention only.
 from __future__ import annotations
 
 import copy
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 
+from vllm.utils.math_utils import cdiv
 from vllm.v1.decode_tiles import (
+    minimax_split_counts,
     HEAD_TP_SPLIT_CAP,
     flash_attn_split_kv_block_tokens as flash_attn_split_kv_block_tokens,
     pack_head_tp_tile as pack_head_tp_tile,
@@ -36,6 +39,50 @@ def decode_options(config: VllmConfig) -> dict[str, Any] | None:
     if not isinstance(opts, dict) or not isinstance(opts.get("enabled", False), bool):
         raise ValueError("head_tp must be an object with a boolean enabled field")
     return opts if opts.get("enabled", False) else None
+
+
+@dataclass(frozen=True)
+class DecodeRow:
+    req_id: str
+    position: int  # number of valid prior KV tokens
+
+
+class DecodePolicy:
+    """Called outside capture on every decode step. None keeps all rows local."""
+
+    def __init__(self, options):
+        self.threshold = int(options.get("min_context", 0))
+        self.tile = options.get("tile", "minimax")
+        if self.tile not in ("minimax", "one"):
+            raise ValueError("head_tp.tile must be minimax or one")
+
+    def select(
+        self,
+        rows: Sequence[DecodeRow],
+        *,
+        peer_positions: Sequence[int],
+        rank: int,
+        step: int,
+    ) -> str | None:
+        candidates = (r for r in rows if r.position >= self.threshold)
+        row = max(candidates, key=lambda r: r.position, default=None)
+        return row.req_id if row else None
+
+    def splits(
+        self,
+        lengths: list[int],
+        heads: list[int],
+        *,
+        block_n: int,
+        sms: int,
+        limit: int,
+        rank: int,
+        step: int,
+    ) -> Sequence[int]:
+        if self.tile == "one":
+            return [1] * len(lengths)
+        blocks = [max(1, cdiv(n, block_n)) for n in lengths]
+        return minimax_split_counts(blocks, heads, max(sum(heads), sms), limit)
 
 
 @dataclass

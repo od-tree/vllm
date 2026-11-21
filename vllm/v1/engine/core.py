@@ -215,7 +215,14 @@ class EngineCore:
         # Batch queue for scheduled batches. This enables us to asynchronously
         # schedule and execute batches, and is required by pipeline parallelism
         # to eliminate pipeline bubbles.
-        self.batch_queue_size = vllm_config.max_concurrent_batches
+        from vllm.v1.head_tp import decode_options
+
+        # A layout transition consumes the previous step's committed KV.
+        self.batch_queue_size = (
+            1
+            if decode_options(vllm_config) is not None
+            else vllm_config.max_concurrent_batches
+        )
         self.batch_queue: (
             deque[tuple[Future[ModelRunnerOutput], SchedulerOutput, Future[Any]]] | None
         ) = None
@@ -352,27 +359,12 @@ class EngineCore:
         scheduler_kv_cache_config = generate_scheduler_kv_cache_config(kv_cache_configs)
         from vllm.v1.head_tp import decode_options
 
-        helper_pages = None
-        options = decode_options(vllm_config)
-        if options is not None:
-            if not vllm_config.use_v2_model_runner:
-                raise ValueError("head_tp requires VLLM_USE_V2_MODEL_RUNNER=1")
-            capacity = min(
-                vllm_config.model_config.max_model_len,
-                int(options.get("max_context", vllm_config.model_config.max_model_len)),
-            )
-            groups = scheduler_kv_cache_config.kv_cache_groups
-            if capacity < 1 or len(groups) != 1:
-                raise ValueError("head_tp requires positive max_context and one KV group")
-            block_size = groups[0].kv_cache_spec.block_size
-            # Two half-width helper pages fit in one physical KV block. Keep
-            # these private blocks outside the scheduler's allocatable range.
-            count = (capacity + 2 * block_size - 1) // (2 * block_size)
-            total = scheduler_kv_cache_config.num_blocks
-            if total - count <= 1:
-                raise ValueError("head_tp helper reservation exhausts the KV cache")
-            scheduler_kv_cache_config.num_blocks = total - count
-            helper_pages = list(range(total - count, total))
+        if decode_options(vllm_config) is not None:
+            if (
+                not vllm_config.use_v2_model_runner
+                or vllm_config.kv_transfer_config is not None
+            ):
+                raise ValueError("packed head-TP requires V2 with worker-local KV")
         vllm_config.cache_config.num_gpu_blocks = scheduler_kv_cache_config.num_blocks
         kv_cache_groups = scheduler_kv_cache_config.kv_cache_groups
         if kv_cache_groups:
@@ -411,8 +403,6 @@ class EngineCore:
             kv_cache_config.cache_hit_alignment_tokens = cache_hit_alignment_tokens
 
         self.model_executor.initialize_from_config(kv_cache_configs)
-        if helper_pages is not None:
-            self.collective_rpc("set_head_tp_pages", args=(helper_pages,))
         kv_transfer_config = vllm_config.kv_transfer_config
         if (
             kv_transfer_config is not None
@@ -2480,6 +2470,11 @@ class DPEngineCoreProc(EngineCoreProc):
             engine_index=dp_rank,
             tensor_queue=tensor_queue,
         )
+        from vllm.v1.head_tp import decode_options
+        from vllm.v1.core.head_tp_storage import PackedKVCoordinator
+
+        opts = decode_options(vllm_config)
+        self.packed_kv = PackedKVCoordinator(self, opts) if opts is not None else None
         self._attach_head_tp_wire()
 
     def _attach_head_tp_wire(self) -> None:
@@ -2672,6 +2667,10 @@ class DPEngineCoreProc(EngineCoreProc):
                 elif not state.commit_requested and state.is_ready_for_switch():
                     self.process_input_queue_block = True
 
+            if self.packed_kv is not None and (
+                self.engines_running or self.scheduler.has_requests()
+            ):
+                self.packed_kv.advance()
             executed = self._process_engine_step()
             self._maybe_publish_request_counts()
 
@@ -2699,6 +2698,8 @@ class DPEngineCoreProc(EngineCoreProc):
             )
 
             if not self.engines_running:
+                if self.packed_kv is not None:
+                    self.packed_kv.release_finished()
                 if self.dp_rank == 0 or not self.has_coordinator:
                     # Notify client that we are pausing the loop.
                     logger.debug(

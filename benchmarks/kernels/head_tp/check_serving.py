@@ -37,10 +37,19 @@ def main():
     parser.add_argument("--model", default="qwen-2507")
     parser.add_argument("--save", type=Path, required=True)
     parser.add_argument("--reference", type=Path)
+    parser.add_argument("--prompt-length", type=int, default=253)
     parser.add_argument("--logprob-atol", type=float, default=0.005)
+    parser.add_argument(
+        "--check-contention",
+        action="store_true",
+        help="check both ranks after a streaming disconnect (requires --reference)",
+    )
     args = parser.parse_args()
+    if args.check_contention and not args.reference:
+        parser.error("--check-contention requires a matching native --reference")
+
     # The first request crosses a 256-token page boundary during decode.
-    prompts = [[1000 + (i % 7) for i in range(253)], [2000, 2001] * 13]
+    prompts = [[1000 + (i % 7) for i in range(args.prompt_length)], [2000, 2001] * 13]
     with ThreadPoolExecutor(2) as pool:
         futures = [
             pool.submit(generate, args.url, args.model, i, p)
@@ -66,6 +75,45 @@ def main():
             )
         assert worst <= args.logprob_atol, worst
         print(f"Greedy tokens match; maximum logprob difference {worst:.6g}")
+
+        if args.check_contention:
+            # Close the stream while it owns a live packed cache. Both ranks
+            # must subsequently make progress, even if only one lease fits.
+            req = Request(
+                args.url + "/v1/completions",
+                data=json.dumps(
+                    dict(
+                        model=args.model,
+                        prompt=prompts[0],
+                        stream=True,
+                        ignore_eos=True,
+                        temperature=0,
+                        max_tokens=650,
+                    )
+                ).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "X-data-parallel-rank": "0",
+                },
+            )
+            with urlopen(req, timeout=120) as stream:
+                assert any(line.startswith(b"data:") for line in stream)
+            with ThreadPoolExecutor(2) as pool:
+                futures = [
+                    pool.submit(generate, args.url, args.model, rank, prompts[0])
+                    for rank in (0, 1)
+                ]
+                for future in futures:
+                    actual = future.result()
+                    expected = baseline[-1]  # the isolated long request
+                    assert actual["tokens"] == expected["tokens"]
+                    assert all(
+                        abs(a - b) <= args.logprob_atol
+                        for a, b in zip(
+                            actual["logprobs"], expected["logprobs"], strict=True
+                        )
+                    )
+            print("Both competing long requests matched after stream disconnect.")
 
 
 if __name__ == "__main__":

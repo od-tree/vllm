@@ -1,11 +1,12 @@
 # Two-rank head-TP decode for Qwen3 MoE
 
 The V2 runner can split a Qwen3 MoE request's GQA heads across two DP workers
-for single-token decode. The request owner runs QKV projection, rotary
+during prefill and decode. The request owner runs QKV projection, rotary
 embedding, output projection and MoE. Each rank can lend half of its attention
 heads for one request and simultaneously compute a peer's half-head shard.
-Other requests use their local KV. Prefill and mixed prefill/decode steps use
-the regular attention backend.
+Other requests use full-head local KV. A packed request can start on both
+workers from its first prefill chunk. Mixed and chunked prefill are eager;
+single-token decode supports full model graph replay.
 
 ## Run
 
@@ -28,22 +29,32 @@ Use BF16 KV, one full-attention KV group, and equal allocator and kernel page
 sizes. The initial implementation supports head dimension 128, an even number
 of KV heads, PP=1 and regular decode. Omit the head_tp configuration for the
 native DPA baseline. For a bounded comparison, set the same graph capture sizes,
-KV page size, EP options and request stream in both runs. The enabled
-configuration permanently budgets `ceil(max_context / (2 * block_size))`
-physical KV blocks per rank for incoming shards. Capacity is capped at the
-model length. The local scheduler sees the remaining capacity.
+KV page size, EP options and request stream in both runs.
+
+With H KV heads and a B-token page, dense local KV occupies
+`ceil(length / B)` pool blocks on the owner. A sharded request occupies
+`ceil(length / (2*B))` blocks **on each participating GPU**. For local head
+`h` and absolute position `t`, the physical page index is `t // (2*B)`,
+the head slot within that page is `2*h + (t // B) % 2`, and the offset is
+`t % B`. Each local head has 2B consecutive tokens. The scheduler accounts
+for allocated pages on both workers, protects space for admitted requests'
+growth, and returns pages to the regular pool on completion. Native logical
+slot entries for packed requests refer to the null block. Native KV writes
+are masked for those tokens; partial-head pages do not enter the prefix cache.
 
 ## Change the decision during decode
 
 `head_tp.policy_class` accepts the fully qualified Python class name of a
 policy available on both workers. Its constructor receives the head_tp options.
 It can subclass `DecodePolicy` in `vllm.v1.worker.gpu.head_tp_decode`.
-The worker calls the following methods outside graph capture on every eligible
-decode step.
+The DP engine invokes selection before scheduling. The worker chooses splits
+outside graph capture for each decode. Policy instances in the engine and
+worker have separate state.
 
 - `select(rows, *, peer_positions, rank, step)` receives local eligible
   `DecodeRow(req_id, position)` objects and the peer's batch history lengths.
-  Return a local request ID or `None`. The default selects the longest eligible
+  During admission the candidate length includes the prompt. Return a local
+  request ID or `None`. The default selects the longest eligible
   local request at or above `min_context`. This is a forced-collaboration
   policy for experiments.
 - `splits(lengths, heads, *, block_n, sms, limit, rank, step)` receives local
@@ -53,15 +64,15 @@ decode step.
   count is fixed at capture and the per-row values are device inputs to replay.
   Built-in choices for `tile` are `minimax` and `one`.
 
-The owner retains full-width KV throughout decode. On first use, switch or resume
-the workers agree on an absolute token position and synchronously copy the
-peer's prefix heads before attention. Consecutive tokens of the same request
-only send current Q/K/V. The helper writes the absolute slot, returns the output
-of its Q heads, and reuses its private pages when the next request takes over.
-The rank's regular MoE batch contains only its own tokens. An empty local rank
-can still help a peer. A mixed step ends the current collaboration and the next
-eligible step re-evaluates it. Both directions use fixed-size NCCL exchanges
-even when the current policy selects no request.
+A request admitted as packed stores its two halves directly, including during
+chunked prefill. Entering from dense layout migrates the prefix in bounded
+chunks before releasing the old dense blocks. Leaving copies back the remote
+heads and reuses the packed owner pages for even logical blocks. When expansion
+would exceed the available pool budget, the request keeps its packed layout.
+The engine holds each layout through an in-progress chunked prefill. Requests
+too large for full-head storage require packed admission. Transitions run at
+completed scheduling boundaries with one model step in flight. The MoE batch
+continues to contain only the rank's own tokens.
 
 ## Verify
 
@@ -75,3 +86,9 @@ For an end-to-end comparison, run
 on the native server, then repeat on the enabled server with
 `--save headtp.json --reference baseline.json`. This exercises two
 concurrent requests, idle partners and a 256-token page crossing.
+
+For a constrained-pool test use B=256, model length 4096 and
+`--num-gpu-blocks-override 9` on the head-TP server (eight usable blocks
+per worker). Run the comparison with `--prompt-length 3067` against an
+ordinary DPA reference with sufficient cache. Dense KV needs 12 blocks for
+the prompt; packed KV needs six per GPU.

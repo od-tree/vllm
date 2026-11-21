@@ -1446,6 +1446,13 @@ class FlashAttentionImpl(AttentionImpl):
             # we use direct Q, K, V tensors without caching
             return
 
+        head_tp = getattr(self, "head_tp_decode", None)
+        if head_tp is not None and head_tp.enabled:
+            # Packed rows write their own local head range inside attention.
+            slot_mapping = slot_mapping.masked_fill(
+                head_tp.write_mask[: slot_mapping.numel()], -1
+            )
+
         # Scatter write into the KV cache using slot_mapping indices.
         # No TMA kernel is invoked here, so stride canonicalization is not needed.
         # (B, H, N, 2*D) -> ((B, N, H, D), (B, N, H, D))

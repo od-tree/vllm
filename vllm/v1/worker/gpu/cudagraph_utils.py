@@ -760,6 +760,8 @@ class ModelCudaGraphManager(CudaGraphManager):
             def forward_fn(cg_mode: CUDAGraphMode) -> None:
                 decode = getattr(self, "head_tp_decode", None)
                 if decode is not None:
+                    decode.mixed = False
+                    decode.write_mask = decode.local_mask
                     decode.enabled = (
                         desc.cg_mode == CUDAGraphMode.FULL
                         and desc.uniform_token_count == 1

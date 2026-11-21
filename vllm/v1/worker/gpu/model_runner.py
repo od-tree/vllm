@@ -1905,7 +1905,18 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.dp_size,
             self.dp_rank,
             max_query_len=max_query_len,
-            need_eager=is_profile or skip_compiled,
+            need_eager=is_profile
+            or skip_compiled
+            or (
+                getattr(self, "head_tp_decode", None) is not None
+                and (
+                    uniform_tok_count != 1
+                    or self.cudagraph_manager is None
+                    or not self.cudagraph_manager.cudagraph_mode.separate_routine()
+                    or self.cudagraph_manager.cudagraph_mode.decode_mode()
+                    != CUDAGraphMode.FULL
+                )
+            ),
             num_active_loras=num_active_loras,
             parallel_config=self.parallel_config,
             allow_ubatching=(
@@ -2114,22 +2125,18 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         decode = getattr(self, "head_tp_decode", None)
         if decode is not None:
-            # Capture and replay must select the same layer implementation.
+            uniform = (
+                batch_desc.uniform_token_count == 1
+                if batch_desc.cg_mode == CUDAGraphMode.FULL
+                else dp_sync_state is not None
+                and dp_sync_state.uniform_token_count == 1
+            )
             decode.enabled = (
                 not is_profile
                 and not skip_attn_for_dummy_run
-                and (
-                    (
-                        batch_desc.cg_mode == CUDAGraphMode.FULL
-                        and batch_desc.uniform_token_count == 1
-                    )
-                    or (
-                        batch_desc.cg_mode == CUDAGraphMode.NONE
-                        and dp_sync_state
-                        and dp_sync_state.uniform_token_count == 1
-                    )
-                )
+                and (uniform or any(decode.resident))
             )
+            decode.mixed = False
             if decode.enabled:
                 from vllm.v1.worker.gpu.head_tp_decode import DecodeRow
 
@@ -2143,16 +2150,19 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                         )
                     ]
                 )
+                counts = (
+                    []
+                    if dummy_run
+                    else input_batch.num_scheduled_tokens[: len(rows)].tolist()
+                )
                 decode.stage(
                     rows,
                     input_batch.seq_lens,
                     input_batch.num_tokens_after_padding,
                     block_tables[0],
-                    new_requests={r.req_id for r in scheduler_output.scheduled_new_reqs}
-                    | scheduler_output.scheduled_cached_reqs.resumed_req_ids,
+                    counts=counts,
+                    mixed=not uniform,
                 )
-            else:
-                decode.previous = None
         if dummy_run and not head_tp_is_active(scheduler_output.head_tp_step):
             head_tp = None
         else:

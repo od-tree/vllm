@@ -1473,8 +1473,25 @@ class Worker(WorkerBase):
             and self.parallel_config.data_parallel_size > 1
         )
 
-    def set_head_tp_pages(self, pages: list[int]) -> None:
-        self.model_runner.head_tp_decode.set_pages(pages)
+    def change_head_tp_layout(self, action, owner, req_id, packed, dense, position):
+        runner = self.model_runner
+        runner.head_tp_decode.change_layout(
+            action, owner, req_id, packed, dense, position
+        )
+        if owner == runner.dp_rank and action in ("pack", "unpack"):
+            index = runner.req_states.req_id_to_index.get(req_id)
+            if index is not None:
+                ids = (
+                    dense
+                    if action == "unpack"
+                    else [0]
+                    * (
+                        (position + runner.head_tp_decode.block - 1)
+                        // runner.head_tp_decode.block
+                    )
+                )
+                runner.block_tables.append_block_ids(index, (ids,), overwrite=True)
+        torch.cuda.synchronize()
 
     def set_head_tp_idle_step(self, step: Any) -> None:
         """Give an idle worker the step the scheduler just gathered."""
