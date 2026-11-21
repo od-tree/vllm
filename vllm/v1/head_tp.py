@@ -22,10 +22,20 @@ from vllm.v1.decode_tiles import (
 )
 
 if TYPE_CHECKING:
+    from vllm.config import VllmConfig
     from vllm.v1.worker.gpu.input_batch import InputBatch
 
 HeadTPState = Literal["pending_load", "active", "local"]
 HeadTPKVSource = Literal["cpu_pool", "gpu_copy", "none"]
+
+
+def decode_options(config: VllmConfig) -> dict[str, Any] | None:
+    """Options for the two-process Qwen decode path."""
+    extra = config.additional_config
+    opts = extra.get("head_tp", {}) if isinstance(extra, dict) else {}
+    if not isinstance(opts, dict) or not isinstance(opts.get("enabled", False), bool):
+        raise ValueError("head_tp must be an object with a boolean enabled field")
+    return opts if opts.get("enabled", False) else None
 
 
 @dataclass

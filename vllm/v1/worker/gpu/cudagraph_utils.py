@@ -758,6 +758,12 @@ class ModelCudaGraphManager(CudaGraphManager):
                 is_padding = pcp_manager.moe_is_padding(is_padding)
 
             def forward_fn(cg_mode: CUDAGraphMode) -> None:
+                decode = getattr(self, "head_tp_decode", None)
+                if decode is not None:
+                    decode.enabled = (
+                        desc.cg_mode == CUDAGraphMode.FULL
+                        and desc.uniform_token_count == 1
+                    )
                 batch_descriptor = None
                 if cg_mode == CUDAGraphMode.PIECEWISE:
                     batch_descriptor = BatchDescriptor(
@@ -1072,6 +1078,12 @@ def _teardown_profiling_state(runner: "GPUModelRunner") -> None:
     """Release the profiling KV cache and captured graphs while keeping model
     weights, so the real ``initialize_kv_cache`` starts from a clean slate."""
     torch.accelerator.synchronize()
+    if getattr(runner, "head_tp_decode", None) is not None:
+        for layer in runner.compilation_config.static_forward_context.values():
+            impl = getattr(layer, "impl", None)
+            if getattr(impl, "head_tp_decode", None) is runner.head_tp_decode:
+                del impl.head_tp_decode
+        runner.head_tp_decode = None
     if hasattr(runner.model_state, "_mamba_ctx"):
         runner.model_state._mamba_ctx = None
     # Invalidate the align-mode Mamba group metadata cached from the

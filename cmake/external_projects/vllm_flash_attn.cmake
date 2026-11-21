@@ -36,10 +36,17 @@ if(VLLM_FLASH_ATTN_SRC_DIR)
           BINARY_DIR ${CMAKE_BINARY_DIR}/vllm-flash-attn
   )
 else()
+  if("$ENV{VLLM_HEAD_TP_FA3}" STREQUAL "1")
+    set(_fa_repository "https://github.com/od-tree/flash-attention.git")
+    set(_fa_revision "8e52178ea7471b6f368032882c018b1d7c9b18bc")
+  else()
+    set(_fa_repository "https://github.com/vllm-project/flash-attention.git")
+    set(_fa_revision "b273a02621d3c94bc747df67204f591b67f38fae")
+  endif()
   FetchContent_Declare(
           vllm-flash-attn
-          GIT_REPOSITORY https://github.com/vllm-project/flash-attention.git
-          GIT_TAG b273a02621d3c94bc747df67204f591b67f38fae
+          GIT_REPOSITORY ${_fa_repository}
+          GIT_TAG ${_fa_revision}
           GIT_PROGRESS TRUE
           # Don't share the vllm-flash-attn build between build types
           BINARY_DIR ${CMAKE_BINARY_DIR}/vllm-flash-attn

@@ -835,6 +835,14 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.kv_caches = [
             cache for cache in kv_caches_dict.values() if cache.device == self.device
         ]
+        from vllm.v1.head_tp import decode_options
+        from vllm.v1.worker.gpu.head_tp_decode import HeadTPDecode
+
+        options = decode_options(self.vllm_config)
+        self.head_tp_decode = (
+            HeadTPDecode.from_runner(self, options) if options is not None else None
+        )
+        self.cudagraph_manager.head_tp_decode = self.head_tp_decode
         self.model_state.initialize_kv_cache(self.kv_cache_config, self.block_tables)
         if is_profiling:
             self.kv_connector = NO_OP_KV_CONNECTOR
@@ -2104,6 +2112,47 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.model_config, input_batch.num_tokens, ubatch_slices
         )
 
+        decode = getattr(self, "head_tp_decode", None)
+        if decode is not None:
+            # Capture and replay must select the same layer implementation.
+            decode.enabled = (
+                not is_profile
+                and not skip_attn_for_dummy_run
+                and (
+                    (
+                        batch_desc.cg_mode == CUDAGraphMode.FULL
+                        and batch_desc.uniform_token_count == 1
+                    )
+                    or (
+                        batch_desc.cg_mode == CUDAGraphMode.NONE
+                        and dp_sync_state
+                        and dp_sync_state.uniform_token_count == 1
+                    )
+                )
+            )
+            if decode.enabled:
+                from vllm.v1.worker.gpu.head_tp_decode import DecodeRow
+
+                rows = (
+                    []
+                    if dummy_run
+                    else [
+                        DecodeRow(req_id, int(input_batch.num_computed_tokens_np[i]))
+                        for i, req_id in enumerate(
+                            input_batch.req_ids[: input_batch.num_reqs]
+                        )
+                    ]
+                )
+                decode.stage(
+                    rows,
+                    input_batch.seq_lens,
+                    input_batch.num_tokens_after_padding,
+                    block_tables[0],
+                    new_requests={r.req_id for r in scheduler_output.scheduled_new_reqs}
+                    | scheduler_output.scheduled_cached_reqs.resumed_req_ids,
+                )
+            else:
+                decode.previous = None
         if dummy_run and not head_tp_is_active(scheduler_output.head_tp_step):
             head_tp = None
         else:

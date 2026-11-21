@@ -528,7 +528,9 @@ class Scheduler(SchedulerInterface):
         self.head_tp_copied_bytes: dict[str, int] = {}
         self.head_tp_cpu_lookup: Callable[[Request], int | None] | None = None
         heads_divide = num_kv > 0 and num_q % num_kv == 0
-        self.head_tp_sync_enabled = (
+        from vllm.v1.head_tp import decode_options
+
+        self.head_tp_sync_enabled = decode_options(self.vllm_config) is None and (
             dp_size >= 2 and num_kv >= 2 and full_layers > 0 and heads_divide
         )
 

@@ -319,7 +319,7 @@ class CPUPrefixLayer:
             return
         ctx = self._context(request)
         keys: list[OffloadKey] = []
-        with self.manager.lock():
+        with self.manager.lock:
             for block_hash in hashes:
                 key = make_offload_key(bytes(block_hash), self.group_idx)
                 if self.manager.ready_chunk_id(key) is None:
@@ -335,7 +335,7 @@ class CPUPrefixLayer:
         ctx = self._ctx.get(request_id)
         if not keys or ctx is None:
             return
-        with self.manager.lock():
+        with self.manager.lock:
             self.manager.complete_load(keys, ctx)
 
     def _chunk_hashes(self, request: Request) -> list[Any] | None:
@@ -352,7 +352,7 @@ class CPUPrefixLayer:
         if hashes is None:
             return None
         ids: list[int] = []
-        with self.manager.lock():
+        with self.manager.lock:
             for block_hash in hashes:
                 key = make_offload_key(bytes(block_hash), self.group_idx)
                 chunk_id = self.manager.ready_chunk_id(key)

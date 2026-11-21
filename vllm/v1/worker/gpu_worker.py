@@ -1473,6 +1473,9 @@ class Worker(WorkerBase):
             and self.parallel_config.data_parallel_size > 1
         )
 
+    def set_head_tp_pages(self, pages: list[int]) -> None:
+        self.model_runner.head_tp_decode.set_pages(pages)
+
     def set_head_tp_idle_step(self, step: Any) -> None:
         """Give an idle worker the step the scheduler just gathered."""
 

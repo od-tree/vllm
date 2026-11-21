@@ -1227,6 +1227,10 @@ class FlashAttentionImpl(AttentionImpl):
             # Profiling run.
             return output.fill_(0)
 
+        head_tp = getattr(self, "head_tp_decode", None)
+        if head_tp is not None and head_tp.enabled:
+            return head_tp.forward(query, key, value, kv_cache, output, self.scale)
+
         attn_type = self.attn_type
 
         # IMPORTANT!
