@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Time full-batch FA3 and both head-TP rank-local FA3 calls on one Hopper."""
+"""Compare native DP and head-TP rank-local FA3 calls on one Hopper."""
 
 import argparse
 import json
@@ -99,14 +99,18 @@ def reassemble(owner, helper, lengths):
 def measure(args, case):
     lengths = CASES[case]
     data, digest = logical_inputs(lengths, args.seed, "cuda")
-    all_rows = data[0] + data[1]
-    q = torch.stack([query for query, _ in all_rows])
-    kv = [history for _, history in all_rows]
-    expected = reference(all_rows, q, torch.stack([x[-1] for x in kv]))
-    pages = Pages(kv, max(map(len, kv)), 0, q.device)
-    full, _ = native(pages, q)
-    paths = {"full": (full, dict(row_lengths=pages.lengths))}
+    paths = {}
+    expected = {}
     for rank, name in enumerate(("owner", "helper")):
+        rows = data[rank]
+        if rows:
+            q = torch.stack([query for query, _ in rows])
+            kv = [history for _, history in rows]
+            pages = Pages(kv, max(map(len, kv)), 0, q.device)
+            forward, _ = native(pages, q)
+            native_name = f"dp_{name}"
+            paths[native_name] = forward, dict(row_lengths=pages.lengths)
+            expected[native_name] = reference(rows, q, torch.stack([x[-1] for x in kv]))
         paths[name] = local_attention(data, rank, args.cap)
 
     graphs, outputs, metrics = {}, {}, {}
@@ -123,9 +127,12 @@ def measure(args, case):
 
     errors = {}
     split = reassemble(outputs["owner"], outputs["helper"], lengths)
-    for name, out in (("full", outputs["full"]), ("reassembled", split)):
-        torch.testing.assert_close(out.float(), expected, atol=0.005, rtol=0.01)
-        errors[name] = (out.float() - expected).abs().max().item()
+    expected["reassembled"] = torch.cat(list(expected.values()))
+    outputs["reassembled"] = split
+    for name, ref in expected.items():
+        out = outputs[name].float()
+        torch.testing.assert_close(out, ref, atol=0.005, rtol=0.01)
+        errors[name] = (out - ref).abs().max().item()
 
     names = list(paths)
     for i in range(args.rounds):
@@ -141,14 +148,19 @@ def measure(args, case):
                 graphs[name], args.profile_rounds
             )
 
-    slower = statistics.median(
-        map(
-            max,
-            zip(
-                metrics["owner"]["gpu_samples_us"], metrics["helper"]["gpu_samples_us"]
-            ),
+    def critical_samples(owner, helper):
+        owner_times = metrics[owner]["gpu_samples_us"]
+        if helper not in metrics:
+            return owner_times
+        return list(map(max, zip(owner_times, metrics[helper]["gpu_samples_us"])))
+
+    dp_times = critical_samples("dp_owner", "dp_helper")
+    sharded_times = critical_samples("owner", "helper")
+    if "dp_helper" not in metrics:
+        # Idle DP has no FA3 launch and contributes zero to the critical path.
+        metrics["dp_helper"] = dict(
+            row_lengths=[], median_gpu_us=0.0, gpu_samples_us=[], host_samples_us=[]
         )
-    )
     return dict(
         case=case,
         lengths=lengths,
@@ -162,8 +174,11 @@ def measure(args, case):
         replays=args.replays,
         paths=metrics,
         max_abs_error=errors,
-        estimated_sharded_us=slower,
-        full_minus_sharded_us=metrics["full"]["median_gpu_us"] - slower,
+        estimated_dp_us=statistics.median(dp_times),
+        estimated_sharded_us=statistics.median(sharded_times),
+        dp_minus_sharded_us=statistics.median(
+            d - h for d, h in zip(dp_times, sharded_times)
+        ),
     )
 
 
