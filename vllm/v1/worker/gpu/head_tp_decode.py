@@ -145,6 +145,7 @@ class HeadTPDecode:
         self.scheduler_metadata = None
         self.cu_q = torch.arange(rows + 1, dtype=torch.int32, device=self.device)
         self.row = torch.zeros(1, dtype=torch.long, device=self.device)
+        self.return_row = self.row.clone()
         self.local_mask = torch.zeros(max_rows, dtype=torch.bool, device=self.device)
         self.remote_pages = torch.arange(
             self.half, dtype=torch.long, device=self.device
@@ -320,10 +321,13 @@ class HeadTPDecode:
         splits += [1] * ((b - len(rows)) * self.h) + [counts[-1]] * self.half
         self.splits[: len(splits)].copy_(torch.tensor(splits, dtype=torch.int32))
 
-        self.prepare_decode_metadata(b)
+        self.prepare_decode_metadata(b, return_row=idx)
 
-    def prepare_decode_metadata(self, batch_size):
+    def prepare_decode_metadata(self, batch_size, *, return_row=None):
         """Stage one rank-local FA3 launch plan before executing any layer."""
+        # With no local owner, discard the return in the spare row. This
+        # index also has to match the bucket during dummy graph capture.
+        self.return_row.fill_(batch_size if return_row is None else return_row)
         if self.metadata_buffer is None:
             return
         from vllm.vllm_flash_attn.flash_attn_interface import get_scheduler_metadata
@@ -429,7 +433,7 @@ class HeadTPDecode:
         dist.all_gather_into_tensor(gathered, data.contiguous(), group=self.group)
         return gathered.chunk(2)[1 - self.rank]
 
-    def paged_decode(self, queries, key, value, scale):
+    def paged_decode(self, queries, key, value, scale, *, out=None):
         from vllm.vllm_flash_attn.flash_attn_interface import flash_attn_varlen_func
 
         n = queries.shape[0]
@@ -448,12 +452,13 @@ class HeadTPDecode:
             num_splits=self.limit,
             scheduler_metadata=self.scheduler_metadata,
             prepared_row_splits=self.fa_version == 3,
+            out=out,
         )
 
     def forward(self, q, k, v, cache, output, scale):
-        if self.mixed:
-            return self.mixed_forward(q, k, v, cache, output, scale)
         b = q.shape[0]
+        if self.mixed:
+            return self.mixed_forward(q, k, v, cache, output[:b], scale)
         h, half, d, g = self.h, self.half, self.d, self.q_per_k
         grouped = q.view(b, h, g, d)
         packet = torch.cat(
@@ -481,11 +486,20 @@ class HeadTPDecode:
         pages[self.remote_pages, self.offset] = torch.where(self.incoming, kv, previous)
         key, value = pages.unsqueeze(2).split(d, dim=-1)
         queries = torch.cat((grouped.flatten(0, 1), remote[:, :g]), dim=0)
-        attn = self.paged_decode(queries, key, value, scale)
-        returned = self._exchange(attn[-half:])
-        local = attn[: b * h].view(b, h, g, d)
-        upper = torch.where(
-            self.local_mask[:b, None, None, None], returned, local[:, half:]
+        # First b rows are the caller's visible O. The spare row holds the
+        # outgoing half, and its upper half sinks returns on a helper-only rank.
+        direct = (
+            output.shape == (b + 1, h * g, d)
+            and output.dtype == q.dtype
+            and output.is_contiguous()
         )
-        output.view(b, h, g, d).copy_(torch.cat((local[:, :half], upper), dim=1))
-        return output
+        storage = output if direct else q.new_empty((b + 1, h * g, d))
+        attn = storage.view(-1, g, d)[: b * h + half]
+        self.paged_decode(queries, key, value, scale, out=attn)
+        returned = self._exchange(attn[-half:])
+        storage[:, half * g :].index_copy_(
+            0, self.return_row, returned.view(1, half * g, d)
+        )
+        if not direct:
+            output[:b].view(b, h * g, d).copy_(storage[:b])
+        return output[:b]

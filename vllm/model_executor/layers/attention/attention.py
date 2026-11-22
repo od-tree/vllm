@@ -535,10 +535,16 @@ class Attention(nn.Module, AttentionLayerBase):
             ):
                 query, _ = self.query_quant(query, self._q_scale)
 
+        # Keep the scratch row inside the tensor passed to the mutable custom
+        # op, so graph capture and torch.compile see the complete write extent.
+        head_tp_output = (
+            output_shape is None
+            and getattr(self.impl, "head_tp_decode", None) is not None
+        )
         if output_shape is None:
             # Handle both 2D [num_tokens, hidden] and
             # 3D [num_tokens, heads, head_dim] query
-            num_tokens = query.shape[0]
+            num_tokens = query.shape[0] + int(head_tp_output)
             output_shape = torch.Size((num_tokens, self.num_heads * self.head_size_v))
         output = torch.empty(output_shape, dtype=output_dtype, device=query.device)
         hidden_size = output_shape[-1]
@@ -591,6 +597,8 @@ class Attention(nn.Module, AttentionLayerBase):
                 encoded,
                 kv_cache_dummy_dep=kv_cache_dummy_dep,
             )
+        if head_tp_output:
+            output = output[:-1]
         return output.view(-1, hidden_size)
 
     def extra_repr(self) -> str:

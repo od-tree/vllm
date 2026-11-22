@@ -172,7 +172,7 @@ def sharded(pages, q, k, v, maximum, rank, cpu, cap):
         for i, s in enumerate(pages.lengths)
     ]
     dec.stage(rows, pages.lens, n, pages.table)
-    out = torch.empty_like(q)
+    out = q.new_empty(n + 1, Q, D)
     return (
         lambda: dec.forward(q, k, v, pages.cache, out, D**-0.5),
         [(dec, "_exchange", "exchange"), (fa, "flash_attn_varlen_func", "fa3")],

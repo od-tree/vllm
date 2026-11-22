@@ -82,6 +82,16 @@ too large for full-head storage require packed admission. Transitions run at
 completed scheduling boundaries with one model step in flight. The MoE batch
 continues to contain only the rank's own tokens.
 
+### Decode output placement
+
+The Qwen3 attention layer reserves one extra token row in the output passed
+to the attention op. FA writes local head groups into the visible prefix and
+the outbound half-heads into the lower half of the spare row. After the NCCL
+exchange, a single indexed write replaces the cooperating row's upper heads.
+On a helper-only step it writes to the upper half of the spare row. The
+output projection consumes only the visible prefix. The two-rank operator
+benchmark uses the same padded allocation.
+
 ### Sharing the FA3 decode schedule across layers
 
 On each rank the runner stages lengths, page tables and requested row splits

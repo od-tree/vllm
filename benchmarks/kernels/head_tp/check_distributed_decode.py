@@ -1,6 +1,7 @@
 """torchrun --standalone --nproc-per-node=2 check_distributed_decode.py"""
 
 import os
+from unittest.mock import patch
 
 import torch
 import torch.distributed as dist
@@ -52,14 +53,19 @@ def main():
     q = cache.new_empty(rows, h * g, d).normal_()
     k = cache.new_empty(rows, h, d).normal_()
     v = torch.empty_like(k).normal_()
-    out = torch.empty_like(q)
+    out = q.new_empty(rows + 1, h * g, d)
     scale = d**-0.5
 
     def run():
-        decode.forward(q, k, v, cache, out, scale)
+        visible = decode.forward(q, k, v, cache, out, scale)
+        assert visible.shape == q.shape and visible.data_ptr() == out.data_ptr()
 
     decode.prepare_decode_metadata(rows)
-    run()  # initialize communicator before capture
+    with patch.object(decode, "paged_decode", wraps=decode.paged_decode) as paged:
+        run()  # initialize communicator and check FA's actual output destination
+        fa_out = paged.call_args.kwargs["out"]
+        assert fa_out.data_ptr() == out.data_ptr()
+        assert fa_out.shape == (rows * h + h // 2, g, d)
     torch.cuda.synchronize()
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):

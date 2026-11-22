@@ -1226,13 +1226,16 @@ class FlashAttentionImpl(AttentionImpl):
                 "fused output quantization is not yet supported for FlashAttentionImpl"
             )
 
+        head_tp = getattr(self, "head_tp_decode", None)
+        if head_tp is not None:
+            if head_tp.enabled and attn_metadata is not None:
+                return head_tp.forward(query, key, value, kv_cache, output, self.scale)
+            # Native/profile execution sees only the logical token rows.
+            output = output[: query.shape[0]]
+
         if attn_metadata is None:
             # Profiling run.
             return output.fill_(0)
-
-        head_tp = getattr(self, "head_tp_decode", None)
-        if head_tp is not None and head_tp.enabled:
-            return head_tp.forward(query, key, value, kv_cache, output, self.scale)
 
         attn_type = self.attn_type
 
