@@ -272,3 +272,25 @@ step metadata. Initial prefix placement, CPU step staging, projections and
 MoE are outside this interval. FP32 output checks cover every owner's rows
 before timing. A second replay changes Q and makes the newest KV token
 dominant for one Q head per KV group, including across the rank boundary.
+
+### Full batch and both rank-local FA3 calls on one Hopper
+
+```bash
+python benchmarks/kernels/head_tp/bench_single_rank_batch.py --case all \
+  --output benchmarks/kernels/head_tp/results/single-rank-batch.json
+```
+
+This compute-only comparison uses the two-rank benchmark's cases, seed and
+input hash. The native graph runs every request from both ranks in one
+full-head batch. Two other graphs replay the production owner and helper FA3
+calls separately on the same GPU, including ordinary local requests, packed
+KV heads and inactive virtual rows. Each graph reuses prepared step metadata.
+Q routing, KV writes, NCCL and output assembly are outside the timed region.
+The full output and the reassembled shards must both match unpaged FP32 GQA.
+
+The JSON retains per-path GPU and host samples, separate CUPTI kernel and
+stage times, and per-shard split counts. Timing order rotates by round.
+`estimated_sharded_us` takes the larger shard time each round, then the median.
+`full_minus_sharded_us` is the estimated compute saving against the consolidated
+single-GPU batch. With a busy helper, native two-rank DP has a different
+baseline because it already processes the partner's requests concurrently.
