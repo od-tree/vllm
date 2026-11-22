@@ -19,6 +19,7 @@ import torch.distributed as dist
 from vllm.utils.math_utils import cdiv
 
 Q, H, D, B = 32, 4, 128, 256
+# Keep these seed groups fixed so a placement change preserves each request's Q/K/V.
 CASES = {
     "smoke": ([513, 17], [129]),
     "idle": ([141698], []),
@@ -43,7 +44,17 @@ def logical_inputs(lengths, seed, rank):
                 digest.update(memoryview(tensor.view(torch.uint8).numpy()))
             rows.append((q.to(rank), kv.to(rank)))
         data.append(rows)
-    return data, digest.hexdigest()
+    # The first request stays on rank 0. Its two equal head shards contribute
+    # the same KV work on both ranks, so only full-head background rows enter
+    # the placement decision. Prefer the helper on ties for reproducibility.
+    batches = ([data[0][0]], [])
+    background_tokens = [0, 0]
+    background = data[0][1:] + data[1]
+    for request in sorted(background, key=lambda row: len(row[1]), reverse=True):
+        dst = 0 if background_tokens[0] < background_tokens[1] else 1
+        batches[dst].append(request)
+        background_tokens[dst] += len(request[1])
+    return batches, digest.hexdigest()
 
 
 def reference(rows, q, kv):
@@ -265,9 +276,9 @@ def capture(write, forward, spans, fence):
 
 
 def run(args, rank, cpu):
-    lengths = CASES[args.case]
+    data, digest = logical_inputs(CASES[args.case], args.seed, rank)
+    lengths = [[len(kv) for _, kv in batch] for batch in data]
     maximum = lengths[0][0]
-    data, digest = logical_inputs(lengths, args.seed, rank)
     local = data[rank]
     count = len(local)
     q = torch.stack([x[0] for x in local]) if count else data[0][0][0][None].clone()
@@ -372,6 +383,7 @@ def run(args, rank, cpu):
         result = dict(
             method=args.method,
             case=args.case,
+            placement="balanced_background",
             lengths=lengths,
             seed=args.seed,
             input_sha256=digest,

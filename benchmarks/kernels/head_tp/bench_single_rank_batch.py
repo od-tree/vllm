@@ -97,8 +97,8 @@ def reassemble(owner, helper, lengths):
 
 @torch.inference_mode()
 def measure(args, case):
-    lengths = CASES[case]
-    data, digest = logical_inputs(lengths, args.seed, "cuda")
+    data, digest = logical_inputs(CASES[case], args.seed, "cuda")
+    lengths = [[len(kv) for _, kv in batch] for batch in data]
     paths = {}
     expected = {}
     for rank, name in enumerate(("owner", "helper")):
@@ -163,6 +163,7 @@ def measure(args, case):
         )
     return dict(
         case=case,
+        placement="balanced_background",
         lengths=lengths,
         seed=args.seed,
         input_sha256=digest,

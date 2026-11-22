@@ -252,10 +252,25 @@ done
 ```
 
 All methods use the same BF16 Q/K/V, request owners, page size 256, and
-32 Q / 4 KV heads of dimension 128. Compare `input_sha256` across each
-triplet. Smoke has owner lengths [513, 17] and partner length [129].
-The other cases put a 141,698-token request on rank 0 and respectively
-zero, four 512-token, or eight 16,384-token requests on rank 1.
+32 Q / 4 KV heads of dimension 128. Compare `input_sha256` (logical inputs),
+`placement` and `lengths` (rank ownership) across runs. Each rank reads
+two KV heads of the shared request. Place the full-head background requests
+in descending length order on the side with fewer background tokens, giving
+the helper the first request on a tie. DP and NanoCP use the same initial
+owners as head-TP.
+
+| Case | Original rank 0 batch | Original rank 1 batch |
+|---|---|---|
+| smoke | 513 + 17 | 129 |
+| idle | 141,698 | empty |
+| light | 141,698 + 2 × 512 | 2 × 512 |
+| busy | 141,698 + 4 × 16,384 | 4 × 16,384 |
+
+In busy, each rank reads 545,540 KV head-tokens after head sharding
+(2 × 141,698 + 4 × 4 × 16,384). Earlier light and busy results placed all
+background requests on rank 1. With the same seed and RNG environment,
+the logical-input hashes are preserved across the placement change.
+
 DP keeps each owner's original batch and uses native FA3 auto. NanoCP runs
 the upstream GQA operator with its published FA3 and Q/O/LSE IPC exchanges,
 splitting the long prefix at a page boundary. It uses separate NHD caches.
@@ -282,8 +297,8 @@ python benchmarks/kernels/head_tp/bench_single_rank_batch.py --case all \
 
 This compute-only comparison uses the two-rank benchmark's cases, seed and
 input hash. For native DP, each rank runs full-head FA3 on its own original
-requests. In the busy case the owner runs one 141,698-token request and the
-helper independently runs eight 16,384-token requests. An idle DP helper
+requests. In the busy case both ranks run four 16,384-token requests, and the owner
+also runs the entire 141,698-token request. An idle DP helper
 has zero compute time and no graph samples. The head-TP owner and helper
 replay their production FA3 calls with packed KV, ordinary local requests
 and inactive virtual rows. The same GPU runs all active graphs in rotating
