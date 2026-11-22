@@ -1229,7 +1229,15 @@ class FlashAttentionImpl(AttentionImpl):
         head_tp = getattr(self, "head_tp_decode", None)
         if head_tp is not None:
             if head_tp.enabled and attn_metadata is not None:
-                return head_tp.forward(query, key, value, kv_cache, output, self.scale)
+                return head_tp.forward(
+                    query,
+                    key,
+                    value,
+                    kv_cache,
+                    output,
+                    self.scale,
+                    local_kv_written=True,
+                )
             # Native/profile execution sees only the logical token rows.
             output = output[: query.shape[0]]
 
@@ -1454,7 +1462,10 @@ class FlashAttentionImpl(AttentionImpl):
 
         head_tp = getattr(self, "head_tp_decode", None)
         if head_tp is not None and head_tp.enabled:
-            # Packed rows write their own local head range inside attention.
+            if not head_tp.mixed:
+                head_tp.write_decode_kv(key, value, kv_cache, slot_mapping)
+                return
+            # Mixed prefill writes its packed rows inside attention.
             slot_mapping = slot_mapping.masked_fill(
                 head_tp.write_mask[: slot_mapping.numel()], -1
             )

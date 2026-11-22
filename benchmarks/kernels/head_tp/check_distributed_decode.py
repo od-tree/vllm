@@ -50,14 +50,16 @@ def main():
         cpu,
     )
     oracle = cache.clone()
-    q = cache.new_empty(rows, h * g, d).normal_()
-    k = cache.new_empty(rows, h, d).normal_()
-    v = torch.empty_like(k).normal_()
+    # Qwen's projections can have row strides larger than their logical width.
+    qkv = cache.new_empty(rows, h * g + 2 * h, d).normal_()
+    q, k, v = qkv.split((h * g, h, h), dim=1)
+    slots = torch.full((rows,), -1, device=device, dtype=torch.long)
     out = q.new_empty(rows + 1, h * g, d)
     scale = d**-0.5
 
     def run():
-        visible = decode.forward(q, k, v, cache, out, scale)
+        decode.write_decode_kv(k, v, cache, slots)
+        visible = decode.forward(q, k, v, cache, out, scale, local_kv_written=True)
         assert visible.shape == q.shape and visible.data_ptr() == out.data_ptr()
 
     decode.prepare_decode_metadata(rows)
@@ -122,11 +124,12 @@ def main():
         k.normal_()
         v.normal_()
         ref = []
+        slots.fill_(-1)
         for i, pos in enumerate(positions):
             page = table[i, pos // block]
             oracle[page, :, pos % block] = torch.cat((k[i], v[i]), dim=-1)
             if selected[rank] != i:
-                cache[page, :, pos % block] = oracle[page, :, pos % block]
+                slots[i] = page * block + pos % block
             keys, vals = (
                 oracle[table[i].long()]
                 .transpose(1, 2)
@@ -137,6 +140,27 @@ def main():
             scores = torch.einsum("hgd,thd->hgt", q[i].float().view(h, g, d), keys)
             ref.append(torch.einsum("hgt,thd->hgd", (scores * scale).softmax(-1), vals))
         graph.replay()
+        # Inspect the token itself: a wrong write at a long position can have
+        # too little softmax weight to trip the attention output tolerance.
+        current_kv = torch.cat((k, v), dim=-1)
+        both_kv = current_kv.new_empty(2 * rows, h, 2 * d)
+        dist.all_gather_into_tensor(both_kv, current_kv)
+        virtual = cache.view(-1, block, 2 * d)
+        for i, pos in enumerate(positions):
+            if i == selected[rank]:
+                actual = virtual[decode.owner_pages, decode.owner_offset]
+                expected = current_kv[i, : h // 2]
+            else:
+                actual = cache[table[i, pos // block], :, pos % block]
+                expected = current_kv[i]
+            torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+        peer = 1 - rank
+        if selected[peer] is not None:
+            expected = both_kv[peer * rows + selected[peer], h // 2 :]
+            torch.testing.assert_close(
+                virtual[decode.remote_pages, decode.offset], expected, rtol=0, atol=0
+            )
+        torch.testing.assert_close(cache[0], oracle[0], rtol=0, atol=0)
         if n:
             torch.testing.assert_close(
                 out[:n].float().view(n, h, g, d),

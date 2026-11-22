@@ -94,21 +94,21 @@ class Pages:
                 dest[full, :tail].copy_(segment[full * B :])
             first += count
 
-    def writer(self, mapping, k, v, packed_mask=None):
-        import vllm._C_stable_libtorch  # noqa: F401 -- registers CUDA cache ops
-
+    def writer(self, mapping, k, v, decode=None):
         slots = [-1] * len(k)
         for row, segment in mapping:
             slots[row] = self.dense[segment][-1] * B + (self.lengths[segment] - 1) % B
         indices = torch.tensor(slots, device=k.device)
+        if decode is not None:
+            return lambda: decode.write_decode_kv(k, v, self.cache, indices)
+
+        import vllm._C_stable_libtorch  # noqa: F401 -- registers CUDA cache ops
+
         scale = torch.ones((), device=k.device)
 
         def write():
-            slots = (
-                indices if packed_mask is None else indices.masked_fill(packed_mask, -1)
-            )
             torch.ops._C_cache_ops.reshape_and_cache_flash(
-                k, v, self.k, self.v, slots, "auto", scale, scale
+                k, v, self.k, self.v, indices, "auto", scale, scale
             )
 
         return write
@@ -174,9 +174,9 @@ def sharded(pages, q, k, v, maximum, rank, cpu, cap):
     dec.stage(rows, pages.lens, n, pages.table)
     out = q.new_empty(n + 1, Q, D)
     return (
-        lambda: dec.forward(q, k, v, pages.cache, out, D**-0.5),
+        lambda: dec.forward(q, k, v, pages.cache, out, D**-0.5, local_kv_written=True),
         [(dec, "_exchange", "exchange"), (fa, "flash_attn_varlen_func", "fa3")],
-        dec.write_mask[:n],
+        dec,
     )
 
 
@@ -304,17 +304,15 @@ def run(args, rank, cpu):
     if args.method == "nanocp":
         # Match the two separate NHD paged caches in the published GQA fixture.
         pages.k, pages.v = pages.k.contiguous(), pages.v.contiguous()
-    packed_mask = None
+    decode = None
     if args.method == "dp":
         forward, spans = native(pages, q)
     elif args.method == "headtp":
-        forward, spans, packed_mask = sharded(
-            pages, q, k, v, maximum, rank, cpu, args.cap
-        )
+        forward, spans, decode = sharded(pages, q, k, v, maximum, rank, cpu, args.cap)
     else:
         slots = max(len(lengths[0]), 1 + len(lengths[1]))
         forward, spans = nanocp(args.nano_root, pages, q, count, prefix, slots, rank)
-    write = pages.writer(mapping, k, v, packed_mask) if count else lambda: None
+    write = pages.writer(mapping, k, v, decode) if count else lambda: None
     fence = q.new_zeros(1)
     for _ in range(3):
         dist.all_reduce(fence)

@@ -129,6 +129,10 @@ class HeadTPDecode:
         self.cpu_group = cpu_group
         self.columns = cdiv(self.max_len, self.block)
         rows = max_rows * self.h + self.half
+        # One worker stream consumes these buffers sequentially across layers.
+        self.query_workspace = caches[0].new_empty(rows, self.q_per_k, self.d)
+        self.send_packet = caches[0].new_empty(self.half, self.q_per_k + 2, self.d)
+        self.empty_slots = torch.empty(0, dtype=torch.long, device=self.device)
         self.table = torch.zeros(
             rows, self.columns, dtype=torch.int32, device=self.device
         )
@@ -455,37 +459,30 @@ class HeadTPDecode:
             out=out,
         )
 
-    def forward(self, q, k, v, cache, output, scale):
+    def write_decode_kv(self, k, v, cache, slots):
+        from vllm.v1.worker.gpu.head_tp_kernels import write_kv
+
+        write_kv(k, v, cache, slots, self)
+
+    def forward(self, q, k, v, cache, output, scale, *, local_kv_written=False):
         b = q.shape[0]
         if self.mixed:
             return self.mixed_forward(q, k, v, cache, output[:b], scale)
+
+        from vllm.v1.worker.gpu.head_tp_kernels import (
+            prepare_queries_and_packet,
+            receive,
+        )
+
         h, half, d, g = self.h, self.half, self.d, self.q_per_k
-        grouped = q.view(b, h, g, d)
-        packet = torch.cat(
-            (
-                grouped.index_select(0, self.row)[0, half:],
-                k.index_select(0, self.row)[0, half:, None],
-                v.index_select(0, self.row)[0, half:, None],
-            ),
-            dim=1,
-        )
-        remote = self._exchange(packet)
-        pages = cache.view(-1, self.block, 2 * d)
-        own = torch.cat(
-            (
-                k.index_select(0, self.row)[0, :half],
-                v.index_select(0, self.row)[0, :half],
-            ),
-            dim=-1,
-        )
-        pages[self.owner_pages, self.owner_offset] = torch.where(
-            self.has_owner, own, pages[self.owner_pages, self.owner_offset]
-        )
-        kv = remote[:, g:].reshape(half, 2 * d)
-        previous = pages[self.remote_pages, self.offset]
-        pages[self.remote_pages, self.offset] = torch.where(self.incoming, kv, previous)
-        key, value = pages.unsqueeze(2).split(d, dim=-1)
-        queries = torch.cat((grouped.flatten(0, 1), remote[:, :g]), dim=0)
+        if not local_kv_written:
+            # Standalone callers historically update ordinary rows themselves.
+            self.write_decode_kv(k, v, cache, self.empty_slots)
+        queries = self.query_workspace[: b * h + half]
+        prepare_queries_and_packet(q, k, v, queries, self.send_packet, self)
+        remote = self._exchange(self.send_packet)
+        receive(remote, queries[b * h :], cache, self)
+        key, value = cache.view(-1, self.block, 1, 2 * d).split(d, dim=-1)
         # First b rows are the caller's visible O. The spare row holds the
         # outgoing half, and its upper half sinks returns on a helper-only rank.
         direct = (

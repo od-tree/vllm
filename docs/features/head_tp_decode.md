@@ -43,8 +43,9 @@ the head slot within that page is `2*h + (t // B) % 2`, and the offset is
 `t % B`. Each local head has 2B consecutive tokens. The scheduler accounts
 for allocated pages on both workers, protects space for admitted requests'
 growth, and returns pages to the regular pool on completion. Native logical
-slot entries for packed requests refer to the null block. Native KV writes
-are masked for those tokens; partial-head pages do not enter the prefix cache.
+slot entries for packed requests refer to the null block. During decode the
+writer routes those tokens to their packed pages. Mixed prefill masks their
+native slot writes. Partial-head pages do not enter the prefix cache.
 
 ## Change the decision during decode
 
@@ -81,6 +82,25 @@ The engine holds each layout through an in-progress chunked prefill. Requests
 too large for full-head storage require packed admission. Transitions run at
 completed scheduling boundaries with one model step in flight. The MoE batch
 continues to contain only the rank's own tokens.
+
+### Decode Q/K/V staging
+
+In single-token decode, the KV update hook writes ordinary rows into their
+native slots and active owner heads into packed pages in one Triton launch.
+The owner page address is valid even when its native slot is masked.
+A second kernel writes the local FA query rows and the outgoing Q/K/V
+packet directly from the post-RoPE Q/K and projection V, respecting their
+row and head strides. After NCCL, one kernel fills the inbound FA query
+rows and stores the peer's current K/V directly at the packed offset.
+Inactive routes skip KV stores. Both query and send buffers have stable
+addresses for graph replay. Mixed/chunked prefill keeps its own causal path.
+
+On two RTX 5090s (FA2, one split), the balanced busy case compared this
+change with the same output assembly at `ae2b3f4512`. Three independent
+process pairs per version gave median slower-rank layer times of 4198.40 µs
+before and 4162.56 µs after. In a separately instrumented graph the owner
+interval from the first exchange return to attention entry fell from 34.02
+to 3.30 µs. Hopper FA3/work64 needs a separate hardware measurement.
 
 ### Decode output placement
 
@@ -285,7 +305,8 @@ DP keeps each owner's original batch and uses native FA3 auto. NanoCP runs
 the upstream GQA operator with its published FA3 and Q/O/LSE IPC exchanges,
 splitting the long prefix at a page boundary. It uses separate NHD caches.
 Head-TP uses the serving worker with packed LBHNC pages, `tile=work`, and
-`max_splits=64`. Regular rows use vLLM's KV write kernel in all three runs.
+`max_splits=64`. DP and NanoCP write ordinary rows with vLLM's KV write
+kernel. Head-TP uses the serving worker's combined ordinary/packed KV writer.
 
 The GPU interval starts after a common NCCL start fence and includes the
 current token KV write, attention, required exchanges, output assembly and
