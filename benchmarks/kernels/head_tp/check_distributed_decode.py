@@ -58,6 +58,7 @@ def main():
     def run():
         decode.forward(q, k, v, cache, out, scale)
 
+    decode.prepare_decode_metadata(rows)
     run()  # initialize communicator before capture
     torch.cuda.synchronize()
     graph = torch.cuda.CUDAGraph()

@@ -36,7 +36,11 @@ if(VLLM_FLASH_ATTN_SRC_DIR)
           BINARY_DIR ${CMAKE_BINARY_DIR}/vllm-flash-attn
   )
 else()
+  set(_fa_patch_args)
   if("$ENV{VLLM_HEAD_TP_FA3}" STREQUAL "1")
+    set(_fa_patch_args PATCH_COMMAND "${CMAKE_COMMAND}"
+        "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/head_tp_step_metadata.patch"
+        -P "${CMAKE_CURRENT_LIST_DIR}/patches/apply_head_tp_metadata.cmake")
     set(_fa_repository "https://github.com/od-tree/flash-attention.git")
     set(_fa_revision "8e52178ea7471b6f368032882c018b1d7c9b18bc")
   else()
@@ -47,6 +51,7 @@ else()
           vllm-flash-attn
           GIT_REPOSITORY ${_fa_repository}
           GIT_TAG ${_fa_revision}
+          ${_fa_patch_args}
           GIT_PROGRESS TRUE
           # Don't share the vllm-flash-attn build between build types
           BINARY_DIR ${CMAKE_BINARY_DIR}/vllm-flash-attn

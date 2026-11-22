@@ -18,6 +18,7 @@ import torch
 from vllm.utils.math_utils import cdiv
 from vllm.v1.decode_tiles import (
     minimax_split_counts,
+    work_split_counts,
     HEAD_TP_SPLIT_CAP,
     flash_attn_split_kv_block_tokens as flash_attn_split_kv_block_tokens,
     pack_head_tp_tile as pack_head_tp_tile,
@@ -53,8 +54,8 @@ class DecodePolicy:
     def __init__(self, options):
         self.threshold = int(options.get("min_context", 0))
         self.tile = options.get("tile", "minimax")
-        if self.tile not in ("minimax", "one"):
-            raise ValueError("head_tp.tile must be minimax or one")
+        if self.tile not in ("minimax", "one", "work"):
+            raise ValueError("head_tp.tile must be minimax, one or work")
 
     def select(
         self,
@@ -81,6 +82,10 @@ class DecodePolicy:
     ) -> Sequence[int]:
         if self.tile == "one":
             return [1] * len(lengths)
+        if self.tile == "work":
+            return work_split_counts(
+                [cdiv(n, block_n) for n in lengths], heads, sms, limit, 0.75, 1
+            )
         blocks = [max(1, cdiv(n, block_n)) for n in lengths]
         return minimax_split_counts(blocks, heads, max(sum(heads), sms), limit)
 

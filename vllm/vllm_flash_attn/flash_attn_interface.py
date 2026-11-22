@@ -140,6 +140,7 @@ def get_scheduler_metadata(
     num_splits=0,  # Can be tuned for speed
     pack_gqa=None,  # Can be tuned for speed
     sm_margin=0,  # Can be tuned if some SMs are used for communication
+    row_split_counts=None,
 ):
     cache_seqlens = maybe_contiguous(cache_seqlens)
     if headdim_v is None:
@@ -168,6 +169,7 @@ def get_scheduler_metadata(
         num_splits,
         pack_gqa,
         sm_margin,
+        **({"row_split_counts": row_split_counts} if row_split_counts is not None else {}),
     )
 
     return scheduler_metadata
@@ -217,6 +219,7 @@ def flash_attn_varlen_func(
     gather_kv_indices=None,
     gather_kv_valid_length=None,
     row_split_counts: "torch.Tensor | None" = None,
+    prepared_row_splits: bool = False,
 ):
     """dropout_p should be set to 0.0 during evaluation
     Supports multi-query and grouped-query attention (MQA/GQA) by passing in K, V with fewer heads
@@ -300,6 +303,9 @@ def flash_attn_varlen_func(
             For single-token paged FA3 with explicit num_splits in [1, 128].
             The scheduler clips counts to the bound and removes empty splits.
             Excludes scheduler_metadata.
+        prepared_row_splits: True for scheduler_metadata built from explicit
+            row_split_counts with the same shape and num_splits. Enables the
+            prepared dynamic-split layout also for batches above 992 rows.
 
     Return:
         out: (total, nheads, headdim).
@@ -325,6 +331,8 @@ def flash_attn_varlen_func(
     assert fa_version == 4 or (
         gather_kv_indices is None and gather_kv_valid_length is None
     ), f"gather_kv_* is only supported by FA4, got fa_version={fa_version}"
+    if prepared_row_splits and (fa_version != 3 or scheduler_metadata is None or row_split_counts is not None):
+        raise ValueError("prepared_row_splits requires FA3 metadata prepared with explicit row splits")
     if row_split_counts is not None and fa_version != 3:
         raise ValueError("row_split_counts requires FA3")
 
@@ -431,6 +439,7 @@ def flash_attn_varlen_func(
             cp_rank,
             cp_tot_seqused_k,
             **({"row_split_counts": row_split_counts} if row_split_counts is not None else {}),
+            **({"prepared_row_splits": True} if prepared_row_splits else {}),
         )
     elif fa_version == 4:
         assert alibi_slopes is None, "Alibi is not supported in FA4"

@@ -643,7 +643,10 @@ class FlashAttentionMetadataBuilder(AttentionMetadataBuilder[FlashAttentionMetad
         causal: bool | torch.Tensor,
         max_num_splits: int,
     ) -> torch.Tensor | None:
-        if not aot_schedule:
+        # Head-sharded forward uses different virtual rows and stages its own
+        # metadata. Ordinary prefill still uses this native schedule.
+        head_tp = getattr(self, "head_tp_decode", None)
+        if not aot_schedule or (head_tp is not None and head_tp.enabled):
             return None
 
         cache_dtype = self.cache_config.cache_dtype

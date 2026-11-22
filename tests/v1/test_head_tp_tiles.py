@@ -136,3 +136,19 @@ def test_splits_stop_at_kv_blocks():
         (2, 0, 0), (2, 0, 1),
         (3, 0, 0), (3, 1, 0),
     ]
+
+
+def test_work_policy_splits_a_long_tail_even_when_short_rows_fill_the_wave():
+    from vllm.v1.head_tp import DecodePolicy
+
+    policy = DecodePolicy({"tile": "work"})
+    lengths = [131073] + [128] * 256
+    heads = [2] + [4] * 256
+    counts = policy.splits(
+        lengths, heads, block_n=128, sms=132, limit=64, rank=1, step=1
+    )
+    # 3074 head-blocks / 99 slots -> 32 blocks per split.
+    assert counts == (33,) + (1,) * 256
+    assert policy.splits(
+        [0, 141698], [2, 2], block_n=128, sms=132, limit=8, rank=0, step=2
+    ) == (1, 8)

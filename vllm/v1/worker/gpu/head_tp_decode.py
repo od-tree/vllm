@@ -70,6 +70,7 @@ class HeadTPDecode:
             raise ValueError(
                 "head_tp requires matching allocator and kernel block sizes"
             )
+        group.get_metadata_builder(0).head_tp_decode = decode
         for layer in layers:
             layer.impl.head_tp_decode = decode
         return decode
@@ -133,6 +134,15 @@ class HeadTPDecode:
         )
         self.used = torch.ones(rows, dtype=torch.int32, device=self.device)
         self.splits = torch.ones_like(self.used)
+        # Non-causal GQA metadata: Q lengths, optional dynamic splits, and
+        # one mutable tile counter. Graph buckets share this stable allocation.
+        rounded = cdiv(rows, 4) * 4
+        self.metadata_buffer = (
+            self.used.new_empty(rounded * (1 + int(self.limit > 1)) + 1)
+            if self.fa_version == 3
+            else None
+        )
+        self.scheduler_metadata = None
         self.cu_q = torch.arange(rows + 1, dtype=torch.int32, device=self.device)
         self.row = torch.zeros(1, dtype=torch.long, device=self.device)
         self.local_mask = torch.zeros(max_rows, dtype=torch.bool, device=self.device)
@@ -310,6 +320,31 @@ class HeadTPDecode:
         splits += [1] * ((b - len(rows)) * self.h) + [counts[-1]] * self.half
         self.splits[: len(splits)].copy_(torch.tensor(splits, dtype=torch.int32))
 
+        self.prepare_decode_metadata(b)
+
+    def prepare_decode_metadata(self, batch_size):
+        """Stage one rank-local FA3 launch plan before executing any layer."""
+        if self.metadata_buffer is None:
+            return
+        from vllm.vllm_flash_attn.flash_attn_interface import get_scheduler_metadata
+
+        n = batch_size * self.h + self.half
+        meta = get_scheduler_metadata(
+            batch_size=n,
+            max_seqlen_q=1,
+            max_seqlen_k=self.max_len,
+            num_heads_q=self.q_per_k,
+            num_heads_kv=1,
+            headdim=self.d,
+            cache_seqlens=self.used[:n],
+            cu_seqlens_q=self.cu_q[: n + 1],
+            page_size=self.block,
+            num_splits=self.limit,
+            row_split_counts=self.splits[:n],
+        )
+        self.scheduler_metadata = self.metadata_buffer[: meta.numel()]
+        self.scheduler_metadata.copy_(meta)
+
     def mixed_forward(self, q, k, v, cache, output, scale):
         """Chunked causal prefill and mixed batches with bounded Q/K/V exchange."""
         from vllm.vllm_flash_attn.flash_attn_interface import flash_attn_varlen_func
@@ -394,9 +429,28 @@ class HeadTPDecode:
         dist.all_gather_into_tensor(gathered, data.contiguous(), group=self.group)
         return gathered.chunk(2)[1 - self.rank]
 
-    def forward(self, q, k, v, cache, output, scale):
+    def paged_decode(self, queries, key, value, scale):
         from vllm.vllm_flash_attn.flash_attn_interface import flash_attn_varlen_func
 
+        n = queries.shape[0]
+        return flash_attn_varlen_func(
+            queries,
+            key,
+            value,
+            max_seqlen_q=1,
+            cu_seqlens_q=self.cu_q[: n + 1],
+            max_seqlen_k=self.max_len,
+            seqused_k=self.used[:n],
+            block_table=self.table[:n],
+            softmax_scale=scale,
+            causal=False,
+            fa_version=self.fa_version,
+            num_splits=self.limit,
+            scheduler_metadata=self.scheduler_metadata,
+            prepared_row_splits=self.fa_version == 3,
+        )
+
+    def forward(self, q, k, v, cache, output, scale):
         if self.mixed:
             return self.mixed_forward(q, k, v, cache, output, scale)
         b = q.shape[0]
@@ -427,22 +481,7 @@ class HeadTPDecode:
         pages[self.remote_pages, self.offset] = torch.where(self.incoming, kv, previous)
         key, value = pages.unsqueeze(2).split(d, dim=-1)
         queries = torch.cat((grouped.flatten(0, 1), remote[:, :g]), dim=0)
-        n = queries.shape[0]
-        attn = flash_attn_varlen_func(
-            queries,
-            key,
-            value,
-            max_seqlen_q=1,
-            cu_seqlens_q=self.cu_q[: n + 1],
-            max_seqlen_k=self.max_len,
-            seqused_k=self.used[:n],
-            block_table=self.table[:n],
-            softmax_scale=scale,
-            causal=False,
-            fa_version=self.fa_version,
-            num_splits=self.limit,
-            row_split_counts=self.splits[:n] if self.fa_version == 3 else None,
-        )
+        attn = self.paged_decode(queries, key, value, scale)
         returned = self._exchange(attn[-half:])
         local = attn[: b * h].view(b, h, g, d)
         upper = torch.where(

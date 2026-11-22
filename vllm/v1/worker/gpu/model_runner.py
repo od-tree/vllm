@@ -2015,6 +2015,47 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 num_reqs_padded=input_batch.num_reqs_after_padding,
             )
 
+        decode = getattr(self, "head_tp_decode", None)
+        if decode is not None:
+            uniform = (
+                batch_desc.uniform_token_count == 1
+                if batch_desc.cg_mode == CUDAGraphMode.FULL
+                else dp_sync_state is not None
+                and dp_sync_state.uniform_token_count == 1
+            )
+            decode.enabled = (
+                not is_profile
+                and not skip_attn_for_dummy_run
+                and (uniform or any(decode.resident))
+            )
+            decode.mixed = False
+            if decode.enabled:
+                from vllm.v1.worker.gpu.head_tp_decode import DecodeRow
+
+                rows = (
+                    []
+                    if dummy_run
+                    else [
+                        DecodeRow(req_id, int(input_batch.num_computed_tokens_np[i]))
+                        for i, req_id in enumerate(
+                            input_batch.req_ids[: input_batch.num_reqs]
+                        )
+                    ]
+                )
+                counts = (
+                    []
+                    if dummy_run
+                    else input_batch.num_scheduled_tokens[: len(rows)].tolist()
+                )
+                decode.stage(
+                    rows,
+                    input_batch.seq_lens,
+                    input_batch.num_tokens_after_padding,
+                    block_tables[0],
+                    counts=counts,
+                    mixed=not uniform,
+                )
+
         attn_metadata = None
         slot_mappings_by_layer = None
         ubatch_state: UBatchState | None = None
@@ -2123,46 +2164,6 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.model_config, input_batch.num_tokens, ubatch_slices
         )
 
-        decode = getattr(self, "head_tp_decode", None)
-        if decode is not None:
-            uniform = (
-                batch_desc.uniform_token_count == 1
-                if batch_desc.cg_mode == CUDAGraphMode.FULL
-                else dp_sync_state is not None
-                and dp_sync_state.uniform_token_count == 1
-            )
-            decode.enabled = (
-                not is_profile
-                and not skip_attn_for_dummy_run
-                and (uniform or any(decode.resident))
-            )
-            decode.mixed = False
-            if decode.enabled:
-                from vllm.v1.worker.gpu.head_tp_decode import DecodeRow
-
-                rows = (
-                    []
-                    if dummy_run
-                    else [
-                        DecodeRow(req_id, int(input_batch.num_computed_tokens_np[i]))
-                        for i, req_id in enumerate(
-                            input_batch.req_ids[: input_batch.num_reqs]
-                        )
-                    ]
-                )
-                counts = (
-                    []
-                    if dummy_run
-                    else input_batch.num_scheduled_tokens[: len(rows)].tolist()
-                )
-                decode.stage(
-                    rows,
-                    input_batch.seq_lens,
-                    input_batch.num_tokens_after_padding,
-                    block_tables[0],
-                    counts=counts,
-                    mixed=not uniform,
-                )
         if dummy_run and not head_tp_is_active(scheduler_output.head_tp_step):
             head_tp = None
         else:

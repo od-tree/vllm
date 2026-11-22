@@ -124,7 +124,25 @@ def reference(inputs):
     return torch.stack(outputs).reshape_as(inputs.q)
 
 
-def capture(data, split, split_counts, maximum):
+def prepare_metadata(data, split, split_counts, maximum):
+    from vllm.vllm_flash_attn.flash_attn_interface import get_scheduler_metadata
+
+    return get_scheduler_metadata(
+        len(data.used),
+        1,
+        maximum,
+        data.q.size(1),
+        data.k.size(2),
+        DIM,
+        data.used,
+        cu_seqlens_q=data.cu,
+        page_size=data.k.size(1),
+        num_splits=split,
+        row_split_counts=split_counts,
+    )
+
+
+def capture(data, split, split_counts, maximum, metadata=None):
     from vllm.vllm_flash_attn.flash_attn_interface import flash_attn_varlen_func
 
     output = torch.empty_like(data.q)
@@ -144,7 +162,9 @@ def capture(data, split, split_counts, maximum):
             fa_version=3,
             out=output,
             num_splits=split,
-            row_split_counts=split_counts,
+            row_split_counts=split_counts if metadata is None else None,
+            scheduler_metadata=metadata,
+            prepared_row_splits=metadata is not None and split_counts is not None,
         )
 
     run()
@@ -226,6 +246,11 @@ def main():
     parser.add_argument("--layouts", nargs="+", choices=LAYOUTS, default=list(LAYOUTS))
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--ordered-pages", action="store_true")
+    parser.add_argument(
+        "--prepare-per-step",
+        action="store_true",
+        help="time layer replay after staging its FA3 schedule",
+    )
     parser.add_argument("--rounds", type=int, default=12)
     parser.add_argument("--replays", type=int, default=30)
     parser.add_argument(
@@ -291,8 +316,16 @@ def main():
         # CUDA graphs keep input addresses; retain these external buffers through
         # timing, CUPTI profiling and the final replay of every layout.
         split_counts = {n: torch.full_like(layouts[n].used, split) for n in names}
+        metadata = {
+            n: prepare_metadata(layouts[n], split, split_counts[n], max(args.lengths))
+            if args.prepare_per_step
+            else None
+            for n in names
+        }
         cases = {
-            n: capture(layouts[n], split, split_counts[n], max(args.lengths))
+            n: capture(
+                layouts[n], split, split_counts[n], max(args.lengths), metadata[n]
+            )
             for n in names
         }
         errors = {}
@@ -310,7 +343,12 @@ def main():
                 for name in order:
                     times[name].append(time_graph(cases[name][0], args.replays))
         for name, (graph, _) in cases.items():
-            result = dict(layout=name, splits=split, max_abs_error=errors[name])
+            result = dict(
+                layout=name,
+                splits=split,
+                max_abs_error=errors[name],
+                prepare_per_step=args.prepare_per_step,
+            )
             if args.ncu:
                 with torch.cuda.nvtx.range(f"headtp_{name}_s{split}"):
                     graph.replay()

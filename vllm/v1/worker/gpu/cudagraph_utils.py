@@ -738,6 +738,16 @@ class ModelCudaGraphManager(CudaGraphManager):
 
                 return ubatch_forward_fn
 
+            decode = getattr(self, "head_tp_decode", None)
+            if decode is not None:
+                decode.enabled = (
+                    desc.cg_mode == CUDAGraphMode.FULL and desc.uniform_token_count == 1
+                )
+                decode.mixed = False
+                decode.write_mask = decode.local_mask
+                if decode.enabled:
+                    decode.prepare_decode_metadata(num_tokens)
+
             attn_metadata, slot_mappings = prepare_inputs_to_capture(
                 num_reqs,
                 num_tokens,
@@ -758,14 +768,6 @@ class ModelCudaGraphManager(CudaGraphManager):
                 is_padding = pcp_manager.moe_is_padding(is_padding)
 
             def forward_fn(cg_mode: CUDAGraphMode) -> None:
-                decode = getattr(self, "head_tp_decode", None)
-                if decode is not None:
-                    decode.mixed = False
-                    decode.write_mask = decode.local_mask
-                    decode.enabled = (
-                        desc.cg_mode == CUDAGraphMode.FULL
-                        and desc.uniform_token_count == 1
-                    )
                 batch_descriptor = None
                 if cg_mode == CUDAGraphMode.PIECEWISE:
                     batch_descriptor = BatchDescriptor(

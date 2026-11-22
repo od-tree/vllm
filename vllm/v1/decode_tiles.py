@@ -206,3 +206,31 @@ def fa3_split_candidates(
             candidates[budget] = counts
             seen.add(counts)
     return candidates
+
+
+def work_split_counts(
+    kv_blocks: list[int],
+    kv_heads: list[int],
+    num_sms: int,
+    split_limit: int,
+    waves: float,
+    min_chunk: int,
+) -> tuple[int, ...]:
+    """Size split chunks by total KV work per SM, including unsplit background work."""
+    if (
+        num_sms <= 0
+        or waves <= 0
+        or min_chunk < 1
+        or not 1 <= split_limit <= FA3_EXPLICIT_SPLIT_LIMIT
+    ):
+        raise ValueError("invalid split planner parameters")
+    if len(kv_blocks) != len(kv_heads) or any(
+        blocks < 0 or heads < 1 for blocks, heads in zip(kv_blocks, kv_heads)
+    ):
+        raise ValueError("invalid KV block or head counts")
+    total = sum(blocks * heads for blocks, heads in zip(kv_blocks, kv_heads))
+    slots = max(1, round(num_sms * waves))
+    target = max(min_chunk, (total + slots - 1) // slots)
+    return tuple(
+        max(1, min(split_limit, (n + target - 1) // target)) for n in kv_blocks
+    )

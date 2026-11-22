@@ -12,7 +12,11 @@ single-token decode supports full model graph replay.
 
 Build the Hopper FA3 extension with `VLLM_HEAD_TP_FA3=1` in the build
 environment. Alternatively point `VLLM_FLASH_ATTN_SRC_DIR` at the research
-flash-attention checkout at `8e52178ea7471b6f368032882c018b1d7c9b18bc`.
+flash-attention checkout at `8e52178ea7471b6f368032882c018b1d7c9b18bc`
+with `cmake/external_projects/patches/head_tp_step_metadata.patch` applied.
+The vendor checkout at `57db5bb602f200b864acc600c3a50df4a50595c0` already
+includes the same change. The pinned FetchContent build applies the patch automatically. Rebuild the
+FA3 extension when upgrading from the earlier per-layer split interface.
 The operator needs the FA3 `row_split_counts` argument. On the 5090 development
 machine the same distributed path uses FA2 with a single split.
 
@@ -62,7 +66,11 @@ worker have separate state.
   in `[1, limit]` per entry. Return all ones to disable splitting for the step.
   Each value applies to the row's live KV heads. On Hopper the maximum split
   count is fixed at capture and the per-row values are device inputs to replay.
-  Built-in choices for `tile` are `minimax` and `one`.
+  Built-in choices for `tile` are `minimax`, `one` and experimental `work`.
+  For `work`, set `max_splits=64` to reproduce the calibrated H100 profile.
+  It sums local KV blocks across active heads, divides by 0.75 times the SM
+  count, and splits each row just enough to meet that target chunk size,
+  up to the captured bound. The default remains `minimax`.
 
 A request admitted as packed stores its two halves directly, including during
 chunked prefill. Entering from dense layout migrates the prefix in bounded
@@ -73,6 +81,25 @@ The engine holds each layout through an in-progress chunked prefill. Requests
 too large for full-head storage require packed admission. Transitions run at
 completed scheduling boundaries with one model step in flight. The MoE batch
 continues to contain only the rank's own tokens.
+
+### Sharing the FA3 decode schedule across layers
+
+On each rank the runner stages lengths, page tables and requested row splits
+before the model forward. One FA3 metadata build converts those requests to
+effective splits in the backend's tile units. The runner copies the result into
+fixed-address storage shared by all full-attention layers of that decode step.
+Full graph buckets bind the matching slice during capture. Each forward uses
+precomputed metadata and its own KV pointers and outputs. The FA3 combine
+kernel resets the tile semaphore; for a single split FA3 clears the counter
+after its main kernel. Reuse assumes sequential layers on the worker stream.
+Mixed/chunked prefill uses its own causal launch shapes.
+
+Run `python benchmarks/kernels/head_tp/check_fa3_step_metadata.py` on one
+Hopper to exercise a rank's 48 FA3 layer calls, alternating 6 and 994 virtual
+rows in two graph buckets. The test checks graph outputs against inline
+preparation, effective counts, an empty row, semaphore reset and CUPTI launch
+counts. The expected trace is one prepare per staged step, 48 main kernels
+and 48 combines when the static split bound exceeds one.
 
 ## Verify
 
@@ -151,3 +178,97 @@ sensitivity to that representation. Timing alone cannot establish a TMA
 transition or a pipeline stall. The fork's single-query decode TMA guard
 still sees an effective query height of eight in all three cases. Inspect
 the selected kernel and SASS/counters before attributing a difference to TMA.
+
+## Calibrating the split planner and observing Hopper instructions
+
+Use `benchmarks/kernels/head_tp/bench_fa3_splits.py --suite work --repeat 0`
+on a single Hopper GPU. Run with repeat IDs 0, 1, 2 in separate processes.
+Each shape specifies counts and lengths of two-KV-head foreground shards
+and full four-head background requests. The virtual page table preserves
+the two physical layouts. All candidates for a shape see the same Q/K/V
+and are checked against FP32. The measured interval contains FA3 metadata,
+forward and combine in a graph. Worker staging, empty serving slots, KV
+writes and inter-rank communication are outside this experiment. The JSONL
+records include the static bound, per-row requests, alias names for identical
+plans and the uninstrumented replay samples. Use `--suite confirm` for the
+additional evaluation shapes. `--block-n` describes the experimental binary's
+compiled BlockN; it does not change kernel dispatch.
+
+The H100 calibration used 11 training shapes to select a target chunk size
+from seven wave factors and five minimum chunk lengths at fixed cap 64. For
+`tile=work`, let b[i] be the row's KV length rounded up to blocks and h[i]
+its local KV head count. The target is ceil(sum(b[i]*h[i]) /
+round(0.75*SMs)), at least one block. Request ceil(b[i]/target) splits per
+row, clamped to [1, max_splits]. The kernel may coalesce empty tail splits.
+The same graph can change counts on replay. Calibrate separately for a
+different device, physical tile or head size.
+
+`trace_fa3_decode.py` invokes one marked eager FA3 operation using the same
+packed BF16 bytes and verifies its output. This separates intrusive SASS
+instrumentation from timing. For CUDA 13.0 on H100, the following worked with
+the official NVBit v1.8.2 x86_64 release:
+
+```bash
+cmake -S "$NVBIT/tools/opcode_hist" -B /tmp/opcode-hist -DNVBIT_TOOL_CUDA_ARCHITECTURES=90a
+cmake --build /tmp/opcode-hist -j 3
+LD_PRELOAD=/tmp/opcode-hist/opcode_hist.so COUNT_WARP_LEVEL=1 EXCLUDE_PRED_OFF=1 \
+  python benchmarks/kernels/head_tp/trace_fa3_decode.py --split 64
+nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none --cuda-graph-trace=node \
+  -o layout-graph python benchmarks/kernels/head_tp/bench_fa3_kv_layout.py \
+  --lengths 141698 --splits 64 --layouts virtual256 --ncu
+```
+
+For per-PC counts, the research tool keys selected main-kernel instructions
+by the function-relative offset from NVBit's `Instr::getOffset()` and opcode.
+Match these offsets with `cuobjdump --dump-sass --function MANGLED_SYMBOL LIB`
+on the exact loaded library. Nsight Systems' CUDA kernel table identifies the
+symbol and graph node. Dynamic warp instruction counts and static PCs describe
+execution, not stall cycles, achieved bandwidth or DRAM transactions.
+
+For the layout and split microbenchmarks, pass `--prepare-per-step` to time
+layer replay using a prebuilt schedule. The default includes inline preparation
+to reproduce the earlier sweeps. Charge the one metadata build and buffer copy
+separately when estimating complete step latency.
+
+## Two-Hopper single-layer comparison
+
+Run one process per GPU on the same NVLink-connected Hopper pair. Use this
+fork's cache ops and patched FA3 extension. For NanoCP, install the FA3 wheel
+specified in NanoEngine's AE Dockerfile and its native DLSlime `hao_basic`
+backend. Use the NanoEngine checkout at
+`8abce29fe3ba0af3cd785b5e533b5b4b22ae70d5`. Each command starts fresh
+processes so the upstream communication buffers belong to one graph shape.
+
+```bash
+script=benchmarks/kernels/head_tp/bench_two_rank_attention.py
+out=benchmarks/kernels/head_tp/results/two-rank
+for load in smoke idle light busy; do
+  for method in dp nanocp headtp; do
+    torchrun --standalone --nproc-per-node=2 "$script" \
+      --method "$method" --case "$load" --nano-root ../NanoEngine \
+      --output "$out/$load-$method.json" || exit 1
+  done
+done
+```
+
+All methods use the same BF16 Q/K/V, request owners, page size 256, and
+32 Q / 4 KV heads of dimension 128. Compare `input_sha256` across each
+triplet. Smoke has owner lengths [513, 17] and partner length [129].
+The other cases put a 141,698-token request on rank 0 and respectively
+zero, four 512-token, or eight 16,384-token requests on rank 1.
+DP keeps each owner's original batch and uses native FA3 auto. NanoCP runs
+the upstream GQA operator with its published FA3 and Q/O/LSE IPC exchanges,
+splitting the long prefix at a page boundary. It uses separate NHD caches.
+Head-TP uses the serving worker with packed LBHNC pages, `tile=work`, and
+`max_splits=64`. Regular rows use vLLM's KV write kernel in all three runs.
+
+The GPU interval starts after a common NCCL start fence and includes the
+current token KV write, attention, required exchanges, output assembly and
+rank combine. The JSON reports the median of the paired per-sample maximum
+GPU times over both ranks. It also retains individual rank samples, host
+replay-and-sync latency including the fence, and per-stage CUDA events on
+a separate instrumented graph. Each layer consumes precomputed DP/head-TP
+step metadata. Initial prefix placement, CPU step staging, projections and
+MoE are outside this interval. FP32 output checks cover every owner's rows
+before timing. A second replay changes Q and makes the newest KV token
+dominant for one Q head per KV group, including across the rank boundary.
