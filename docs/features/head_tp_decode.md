@@ -92,3 +92,62 @@ For a constrained-pool test use B=256, model length 4096 and
 per worker). Run the comparison with `--prompt-length 3067` against an
 ordinary DPA reference with sufficient cache. Dense KV needs 12 blocks for
 the prompt; packed KV needs six per GPU.
+
+## Single-GPU FA3 layout experiment
+
+Run `benchmarks/kernels/head_tp/bench_fa3_kv_layout.py` on one Hopper GPU
+using the research FA3 extension described above. It benchmarks the attention
+call for pure cooperative decode rows after the local shard is resident. Q
+and BF16 KV are synthetic; the three cases share their underlying storage.
+Each request has two local KV heads, eight Q heads per KV head and dimension
+128. Pages are shuffled with a fixed seed; `--ordered-pages` selects a
+contiguous physical allocation. Compare layouts within the same invocation.
+
+| Layout | Rows per request | KV heads / tokens per FA page | Question |
+| --- | ---: | --- | --- |
+| virtual256 | 2 | 1 / 256 | Current per-head page-table addressing of the active shard |
+| virtual512 | 2 | 1 / 512 | What changes when FA sees the full contiguous span of one head? |
+| physical512 | 1 | 2 / 512 | What changes when both local heads share a row and one physical page table? |
+
+The middle case allows the page-length effect and the row/head-grouping
+effect to be measured separately. Per-head splits and their static bound
+are identical across layouts at each sweep point. `--lengths` accepts a
+ragged batch of cooperative requests; ordinary full-head background rows,
+empty serving slots, KV update, NCCL and output splice are outside the timing
+window. The page-table and Q views are built once before capture.
+
+```bash
+script=benchmarks/kernels/head_tp/bench_fa3_kv_layout.py
+python "$script" --layout-check-only --lengths 1 255 256 257 511 512 513 8193
+python "$script" --lengths 141698 --splits 1 8 32 64 128 > layout.jsonl
+python "$script" --lengths 8193 141698 --splits 8 64 --ordered-pages > ordered.jsonl
+```
+
+The CPU check gathers every valid K/V token through each page table and
+compares it bitwise to the chronological input. GPU runs also check every
+graph output against independent FP32 attention. JSONL contains the shapes
+and strides, complete uninstrumented graph GPU and host times in microseconds,
+and kernel names, launch counts and stage timings from separate CUPTI replays.
+Layout order rotates between timing rounds. `--profile-rounds 0` disables CUPTI.
+Kernel names that do not match prepare, attention or combine remain visible
+under other. Short cases can fit in L2; use the long case for bandwidth studies.
+
+For DRAM traffic use Nsight Compute on separate runs. For example, run the
+following command for each layout, changing `layout` and keeping the split,
+length and seed fixed. The NVTX range contains one checked graph replay.
+
+```bash
+layout=virtual256
+ncu --nvtx --nvtx-include "headtp_${layout}_s64/" --graph-profiling node \
+  --metrics dram__bytes_read.sum,dram__bytes_write.sum --csv \
+  --log-file "${layout}-s64.csv" \
+  python "$script" --lengths 141698 --splits 64 --layouts "$layout" --ncu
+```
+
+Use the main kernel's counters and duration when investigating KV loads;
+the complete graph also contains scheduler preparation and, for split
+attention, reduction. Scaling with page length or grouped heads indicates
+sensitivity to that representation. Timing alone cannot establish a TMA
+transition or a pipeline stall. The fork's single-query decode TMA guard
+still sees an effective query height of eight in all three cases. Inspect
+the selected kernel and SASS/counters before attributing a difference to TMA.
