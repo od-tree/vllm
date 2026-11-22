@@ -31,7 +31,9 @@ def make_inputs(lengths, device, seed, ordered):
     rng = torch.Generator().manual_seed(seed)
     counts = [math.ceil(n / (2 * BLOCK)) for n in lengths]
     total = sum(counts)
-    ids = torch.arange(total) if ordered else torch.randperm(total, generator=rng)
+    # Physical page order must not change the logical Q/K/V samples.
+    page_rng = torch.Generator().manual_seed(seed)
+    ids = torch.arange(total) if ordered else torch.randperm(total, generator=page_rng)
     # Page zero is padding. Store finite sentinels in every unused position.
     cache = torch.full(
         (total + 1, HEADS, 2 * BLOCK, 2 * DIM), 9.0, dtype=torch.bfloat16
