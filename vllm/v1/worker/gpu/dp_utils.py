@@ -44,6 +44,7 @@ class DPSyncState:
     # Whether every rank's scheduler found that none of its requests can use this
     # step's drafts, so all ranks skip drafting together.
     skip_drafts: bool = False
+    needs_packed_kv: bool = False
 
 
 def sync_cudagraph_and_dp_padding(
@@ -60,13 +61,16 @@ def sync_cudagraph_and_dp_padding(
     allow_ubatching: bool = False,
     uniform_decode: bool = False,
     allow_skip_drafts: bool = False,
+    needs_packed_kv: bool | None = None,
 ) -> tuple[BatchExecutionDescriptor, DPSyncState | None]:
     """Coordinates the batch descriptor and DP padding across all ranks.
 
     Returns (synced_batch_desc, sync). `sync` is None when no rank has work.
     """
     assert dp_size > 1, "DP size must be greater than 1"
-    tensor = torch.zeros(7, dp_size, dtype=torch.int32, device="cpu")
+    tensor = torch.zeros(
+        7 if needs_packed_kv is None else 8, dp_size, dtype=torch.int32, device="cpu"
+    )
     tensor[0][dp_rank] = num_tokens
     tensor[1][dp_rank] = desired_batch_desc.cg_mode.value
     tensor[2][dp_rank] = uniform_token_count or 0  # (0 means None)
@@ -74,6 +78,8 @@ def sync_cudagraph_and_dp_padding(
     tensor[4][dp_rank] = int(allow_ubatching)
     tensor[5][dp_rank] = num_reqs
     tensor[6][dp_rank] = int(allow_skip_drafts)
+    if needs_packed_kv is not None:
+        tensor[7][dp_rank] = int(needs_packed_kv)
     if should_skip_dp_coordination():
         tensor[:] = tensor[:, dp_rank, None].clone()
     else:
@@ -104,6 +110,7 @@ def sync_cudagraph_and_dp_padding(
     allow_ubatching_across_dp = tensor[4]
     num_reqs_across_dp = tensor[5]
     allow_skip_drafts_across_dp = tensor[6]
+    packed = needs_packed_kv is not None and bool(tensor[7].any())
     skip_drafts = bool(torch.all(allow_skip_drafts_across_dp == 1))
 
     # If ranks disagree on the uniform token count, or its 0 (means None) set to None
@@ -176,9 +183,20 @@ def sync_cudagraph_and_dp_padding(
                 eager=ubatch_desc.cg_mode == CUDAGraphMode.NONE,
                 num_reqs=int(num_reqs_across_dp.max()),
                 skip_drafts=skip_drafts,
+                needs_packed_kv=packed,
             )
 
     synced_cg_mode = CUDAGraphMode(int(cg_mode_across_dp.min()))
+
+    if packed and (
+        synced_uniform_token_count != 1
+        or synced_cg_mode != CUDAGraphMode.FULL
+        or cudagraph_manager is None
+        or not cudagraph_manager.cudagraph_mode.separate_routine()
+    ):
+        # Mixed/prefill packed attention has no FULL decode graph. Decide
+        # after the vote so an unused lease cannot downgrade a native batch.
+        synced_cg_mode = CUDAGraphMode.NONE
 
     # If any rank wants to run eager, all ranks run eager
     if synced_cg_mode == CUDAGraphMode.NONE:
@@ -196,6 +214,7 @@ def sync_cudagraph_and_dp_padding(
                 eager=True,
                 num_reqs=int(num_reqs_across_dp.max()),
                 skip_drafts=skip_drafts,
+                needs_packed_kv=packed,
             ),
         )
 
@@ -216,6 +235,9 @@ def sync_cudagraph_and_dp_padding(
         max_query_len=synced_max_query_len,
     )
 
+    if packed:
+        synced_desc = synced_desc.for_packed_decode()
+
     # Update num_tokens_across_dp to reflect padded size.
     num_tokens_across_dp_full[:] = synced_desc.num_tokens
 
@@ -226,6 +248,7 @@ def sync_cudagraph_and_dp_padding(
         eager=False,
         num_reqs=int(num_reqs_across_dp.max()),
         skip_drafts=skip_drafts,
+        needs_packed_kv=packed,
     )
 
 
@@ -244,6 +267,7 @@ def dispatch_cg_and_sync_dp(
     uniform_decode: bool = False,
     allow_skip_drafts: bool = False,
     dp_sync_state: DPSyncState | None = None,
+    needs_packed_kv: bool | None = None,
 ) -> tuple[BatchExecutionDescriptor, DPSyncState | None]:
     """Pick a cudagraph descriptor for this batch, agreeing it across DP ranks.
 
@@ -278,6 +302,8 @@ def dispatch_cg_and_sync_dp(
         allow_skip_drafts: Whether this rank allows skipping drafts, because
             none of its requests can use this step's drafts. Agreed across ranks
             (all must allow it) into `DPSyncState.skip_drafts`.
+        needs_packed_kv: Whether this rank scheduled a packed request. None
+            disables the head-TP vote for deployments without this feature.
         dp_sync_state: Agreement from a prior dispatch over this same batch, to reuse.
             Must come from a batch with this same padded `num_tokens` and the
             same `uniform_token_count`; `num_reqs` may differ, as neither
@@ -349,4 +375,5 @@ def dispatch_cg_and_sync_dp(
         allow_ubatching=allow_ubatching,
         uniform_decode=uniform_decode,
         allow_skip_drafts=allow_skip_drafts,
+        needs_packed_kv=needs_packed_kv,
     )

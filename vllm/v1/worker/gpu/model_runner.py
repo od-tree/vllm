@@ -842,7 +842,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.head_tp_decode = (
             HeadTPDecode.from_runner(self, options) if options is not None else None
         )
-        self.cudagraph_manager.head_tp_decode = self.head_tp_decode
+        self.cudagraph_manager.configure_head_tp(self.head_tp_decode)
         self.model_state.initialize_kv_cache(self.kv_cache_config, self.block_tables)
         if is_profiling:
             self.kv_connector = NO_OP_KV_CONNECTOR
@@ -1897,6 +1897,16 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             # cross-attention cache with dynamic encoder outputs.
             skip_compiled = True
 
+        decode = getattr(self, "head_tp_decode", None)
+        needs_packed_kv = None
+        if decode is not None:
+            resident = decode.resident[self.dp_rank]
+            needs_packed_kv = (
+                not dummy_run
+                and resident is not None
+                and scheduler_output.num_scheduled_tokens.get(resident, 0) > 0
+            )
+
         batch_desc, dp_sync_state = dispatch_cg_and_sync_dp(
             self.cudagraph_manager,
             num_reqs,
@@ -1905,18 +1915,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.dp_size,
             self.dp_rank,
             max_query_len=max_query_len,
-            need_eager=is_profile
-            or skip_compiled
-            or (
-                getattr(self, "head_tp_decode", None) is not None
-                and (
-                    uniform_tok_count != 1
-                    or self.cudagraph_manager is None
-                    or not self.cudagraph_manager.cudagraph_mode.separate_routine()
-                    or self.cudagraph_manager.cudagraph_mode.decode_mode()
-                    != CUDAGraphMode.FULL
-                )
-            ),
+            need_eager=is_profile or skip_compiled,
             num_active_loras=num_active_loras,
             parallel_config=self.parallel_config,
             allow_ubatching=(
@@ -1924,6 +1923,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             ),
             uniform_decode=uniform_tok_count == self.decode_query_len,
             allow_skip_drafts=scheduler_output.skip_drafts,
+            needs_packed_kv=needs_packed_kv,
         )
 
         if batch_desc.num_tokens == 0:
@@ -2015,7 +2015,6 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 num_reqs_padded=input_batch.num_reqs_after_padding,
             )
 
-        decode = getattr(self, "head_tp_decode", None)
         if decode is not None:
             uniform = (
                 batch_desc.uniform_token_count == 1
@@ -2026,7 +2025,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             decode.enabled = (
                 not is_profile
                 and not skip_attn_for_dummy_run
-                and (uniform or any(decode.resident))
+                and dp_sync_state is not None
+                and dp_sync_state.needs_packed_kv
             )
             decode.mixed = False
             if decode.enabled:

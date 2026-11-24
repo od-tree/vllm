@@ -10,6 +10,14 @@ single-token decode supports full model graph replay.
 
 ## Run
 
+For development benchmarks, stage only the pinned config and tokenizer, and
+pass `--load-format dummy --seed 11` to both servers. Use the original layer
+count, dimensions and FP8 configuration. For MoE comparisons, record the
+routing strategy and apply it to every mode, for example
+`VLLM_MOE_ROUTING_SIMULATION_STRATEGY=uniform_random`. Expert traffic depends
+on routing even when the attention shapes are identical. Use the real
+checkpoint and its learned router for final performance and quality validation.
+
 Build the Hopper FA3 extension with `VLLM_HEAD_TP_FA3=1` in the build
 environment. Alternatively point `VLLM_FLASH_ATTN_SRC_DIR` at the research
 flash-attention checkout at `8e52178ea7471b6f368032882c018b1d7c9b18bc`
@@ -23,9 +31,9 @@ machine the same distributed path uses FA2 with a single split.
 ```bash
 VLLM_USE_V2_MODEL_RUNNER=1 VLLM_KV_CACHE_LAYOUT=LBHNC \
 vllm serve /path/to/Qwen3-30B-A3B-Instruct-2507-FP8 \
-  --tensor-parallel-size 1 --data-parallel-size 2 --enable-expert-parallel \
+  --tensor-parallel-size 1 --data-parallel-size 2 --enable-expert-parallel --no-async-scheduling \
   --attention-backend FLASH_ATTN --block-size 256 --max-model-len 4096 \
-  --additional-config '{"head_tp":{"enabled":true,"max_context":4096,"min_context":0,"max_splits":8}}' \
+  --additional-config '{"head_tp":{"enabled":true,"max_context":4096,"admission":"load","tile":"work","max_splits":64}}' \
   --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY"}'
 ```
 
@@ -49,10 +57,57 @@ native slot writes. Partial-head pages do not enter the prefix cache.
 
 ## Change the decision during decode
 
+The `head_tp.admission` option controls placement:
+
+| Value | Decision |
+| --- | --- |
+| `longest` (default) | Use the existing longest-row rule or the custom policy's `select` method. |
+| `local` | Keep optional requests local. This is the feature-on control for measuring host coordination overhead. |
+| `load` | Compare native DP with one candidate head split on either rank using a common snapshot. |
+
+The load policy adds each running request's context length and the front waiting
+request's length on each rank. For a candidate of length L, moving L/2 units
+of work from its owner to its peer changes the maximum of the two rank loads.
+The estimated saving per layer and per step is the reduction in that maximum
+divided by `kv_tokens_per_us`, minus `split_overhead_us`. The policy scores
+this over at most `horizon` remaining output tokens (bounded by the request's
+remaining output budget). Changing layouts charges a copy of the remote KV heads
+for each already-computed token at `migration_gbps`. A resident request can
+keep its shards without paying the entry cost again. Each candidate also budgets
+a prospective return at `return_fraction` of the estimated copy cost.
+
+Initial values are 1400 full-head tokens/µs, 32 µs, 64 steps, 8 GB/s and
+0 respectively. The first two approximate the H100 work64 full-layer data.
+The bandwidth estimate uses an earlier warm one-layer migration (about 145 MB
+in 18 ms). Zero prospective return assumes completion while packed. An actual
+decision to unpack always pays the estimated return cost. Calibrate these
+estimates for the deployment, particularly on the 5090 or with different tiles.
+This models decode and KV movement; it does not predict prefill service time.
+Chunked-prefill pinning and capacity-mandated splits take precedence in every
+mode. Quantify the selector with matched native, local, longest and load runs.
+
+When head-TP is enabled, the V2 runner captures native and packed versions
+of each uniform single-token FULL graph bucket. The existing DP padding
+handshake carries an extra vote for a scheduled packed request. A vote from
+either owner selects the packed path on both ranks (including a dummy helper).
+With no votes the runner uses native attention and KV writes, skipping
+head-TP staging and its two per-layer exchanges. The enabled scheduler still
+coordinates layouts on the host and the second graph uses extra capture memory.
+
+For a 4K-context functional smoke test use the same 3067-token request with
+native DP, `admission=local`, and `admission=load`. For the load-policy run set
+`kv_tokens_per_us=20` and `split_overhead_us=10` to exercise admission at
+this length. Use the native run as the reference for `check_serving.py`.
+These smoke-test coefficients are only for exercising the branch. For latency
+comparisons fix the backend, tile, queue depth, graph sizes and trace across
+runs, including disabling async scheduling in the native baseline.
+
+
 `head_tp.policy_class` accepts the fully qualified Python class name of a
 policy available on both workers. Its constructor receives the head_tp options.
 It can subclass `DecodePolicy` in `vllm.v1.worker.gpu.head_tp_decode`.
-The DP engine invokes selection before scheduling. The worker chooses splits
+In longest-row mode the DP engine invokes the custom selector before scheduling.
+The load and local modes use their built-in joint selector. The worker chooses splits
 outside graph capture for each decode. Policy instances in the engine and
 worker have separate state.
 
@@ -68,10 +123,11 @@ worker have separate state.
   Each value applies to the row's live KV heads. On Hopper the maximum split
   count is fixed at capture and the per-row values are device inputs to replay.
   Built-in choices for `tile` are `minimax`, `one` and experimental `work`.
-  For `work`, set `max_splits=64` to reproduce the calibrated H100 profile.
+  Load admission defaults to `work` with `max_splits=64`. For other modes,
+  set both explicitly to reproduce the calibrated H100 profile.
   It sums local KV blocks across active heads, divides by 0.75 times the SM
   count, and splits each row just enough to meet that target chunk size,
-  up to the captured bound. The default remains `minimax`.
+  up to the captured bound. The legacy longest-row mode defaults to `minimax`.
 
 A request admitted as packed stores its two halves directly, including during
 chunked prefill. Entering from dense layout migrates the prefix in bounded

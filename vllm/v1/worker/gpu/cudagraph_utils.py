@@ -83,6 +83,11 @@ class BatchExecutionDescriptor:
     num_active_loras: int = 0
     # Number of microbatches the batch is split into (DBO). 1 means no splitting.
     num_ubatches: int = 1
+    packed_heads: bool = False
+
+    def for_packed_decode(self) -> "BatchExecutionDescriptor":
+        assert self.cg_mode == CUDAGraphMode.FULL and self.uniform_token_count == 1
+        return replace(self, packed_heads=True)
 
 
 def make_cudagraph_stats(
@@ -616,6 +621,21 @@ class ModelCudaGraphManager(CudaGraphManager):
         self.use_aux_hidden_state_outputs = False
         self.intermediate_tensors: IntermediateTensors | None = None
 
+    def configure_head_tp(self, decode) -> None:
+        self.head_tp_decode = decode
+        if decode is None:
+            return
+        # Dispatch still selects the native descriptor by batch shape. The
+        # worker selects its twin using the layout acknowledged by both ranks.
+        full = self._capture_descs.get(CUDAGraphMode.FULL, [])
+        if full:
+            variants = []
+            for desc in full:
+                variants.append(desc)
+                if desc.uniform_token_count == 1:
+                    variants.append(desc.for_packed_decode())
+            self._capture_descs[CUDAGraphMode.FULL] = variants
+
     def capture(
         self,
         model: nn.Module,
@@ -740,9 +760,7 @@ class ModelCudaGraphManager(CudaGraphManager):
 
             decode = getattr(self, "head_tp_decode", None)
             if decode is not None:
-                decode.enabled = (
-                    desc.cg_mode == CUDAGraphMode.FULL and desc.uniform_token_count == 1
-                )
+                decode.enabled = desc.packed_heads
                 decode.mixed = False
                 decode.write_mask = decode.local_mask
                 if decode.enabled:

@@ -60,7 +60,11 @@ class HeadTPDecode:
             runner.max_model_len,
             runner.max_num_reqs,
             int(options.get("max_context", runner.max_model_len)),
-            int(options.get("max_splits", 8)),
+            int(
+                options.get(
+                    "max_splits", 64 if options.get("admission") == "load" else 8
+                )
+            ),
             policy,
             runner.dp_rank,
             dp.device_group,

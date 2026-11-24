@@ -11,6 +11,8 @@ from vllm.logger import init_logger
 from vllm.utils.import_utils import resolve_obj_by_qualname
 from vllm.utils.math_utils import cdiv
 from vllm.v1.head_tp import DecodePolicy, DecodeRow
+from vllm.v1.head_tp_admission import AdmissionRow, LoadAdmission
+from vllm.v1.kv_cache_interface import AttentionSpec, iter_layer_specs
 from vllm.v1.request import RequestStatus
 
 logger = init_logger(__name__)
@@ -50,6 +52,18 @@ class PackedKVCoordinator:
         self.policy = (resolve_obj_by_qualname(policy) if policy else DecodePolicy)(
             options
         )
+        self.admission = options.get("admission", "longest")
+        if self.admission not in ("load", "local", "longest"):
+            raise ValueError("head_tp.admission must be load, local or longest")
+        if self.admission == "load":
+            spec = next(iter(iter_layer_specs(self.local.kv_cache_spec)))
+            assert isinstance(spec, AttentionSpec)
+            shard_bytes = (
+                (spec.num_kv_heads // 2)
+                * (spec.head_size + spec.head_size_v)
+                * spec.dtype.itemsize
+            )
+            self.cost_model = LoadAdmission(options, shard_bytes)
         self.leases = [Lease(), Lease()]
         self.step = 0
 
@@ -85,31 +99,48 @@ class PackedKVCoordinator:
         # A waiting request that cannot be scheduled yet must not strand KV
         # on both workers while the head of the waiting queue needs memory.
         front = sched.waiting.peek_request() if sched.waiting else None
+        ready = [
+            r
+            for r in requests.values()
+            if r.status == RequestStatus.RUNNING or r is front
+        ]
         rows = [
             DecodeRow(r.request_id, max(r.num_computed_tokens, r.num_prompt_tokens))
-            for r in requests.values()
+            for r in ready
             if r.num_tokens <= self.limit
-            and (r.status == RequestStatus.RUNNING or r is front)
         ]
-        loads = self.gather([r.position for r in rows])
-        choice = self.policy.select(
-            rows, peer_positions=loads[1 - self.rank], rank=self.rank, step=self.step
-        )
-        if choice is not None and choice not in {r.req_id for r in rows}:
-            raise ValueError("head_tp policy selected an ineligible request")
+        required = None
         if (
             old in requests
             and prior
             and 0 < prior.num_computed_tokens < prior.num_prompt_tokens
         ):
-            choice = old  # finish a chunked prefill in a consistent layout
-        # A request that cannot possibly fit as full heads must start packed
-        # (including replay after preemption). Other such requests wait.
+            required = old
         mandatory = [
             r.req_id for r in rows if r.position > self.manager.head_tp_dense_limit
         ]
         if mandatory:
-            choice = old if old in mandatory else mandatory[0]
+            required = old if old in mandatory else mandatory[0]
+
+        if self.admission == "longest":
+            loads = self.gather([r.position for r in rows])
+            choice = self.policy.select(
+                rows,
+                peer_positions=loads[1 - self.rank],
+                rank=self.rank,
+                step=self.step,
+            )
+            if choice is not None and choice not in {r.req_id for r in rows}:
+                raise ValueError("head_tp policy selected an ineligible request")
+            if required is not None:
+                choice = required
+        else:
+            choices = self._joint_choices(ready, required)
+            if all(req is None for req in choices) and all(
+                lease.request is None for lease in self.leases
+            ):
+                return
+            choice = choices[self.rank]
         target = requests.get(choice)
 
         def describe(r):
@@ -218,6 +249,35 @@ class PackedKVCoordinator:
         self.manager.packed_growth_reserve = sum(
             lease.budget - len(lease.blocks) for lease in self.leases
         )
+
+    def _joint_choices(self, ready, required):
+        # Ineligible dense requests still contribute to rank load.
+        snapshot = []
+        if self.admission == "load":
+            snapshot = [
+                (
+                    r.request_id,
+                    max(r.num_computed_tokens, r.num_prompt_tokens),
+                    r.num_computed_tokens,
+                    max(0, r.max_tokens - r.num_output_tokens),
+                    r.num_tokens <= self.limit,
+                )
+                for r in ready
+            ]
+        states = self.gather((snapshot, required))
+        choices = [force for _, force in states]
+        if self.admission == "local" or any(req is not None for req in choices):
+            return choices
+        batches = [[AdmissionRow(*row) for row in batch] for batch, _ in states]
+        residents = [lease.request for lease in self.leases]
+        selected = self.cost_model.choose(batches, residents)
+        if selected is not None:
+            owner, request = selected
+            # Retire the other direction first. If memory pressure prevents
+            # unpacking, preserve the resident layout and reconsider next step.
+            if residents[1 - owner] is None:
+                choices[owner] = request
+        return choices
 
     def release_finished(self):
         if not any(lease.request for lease in self.leases):

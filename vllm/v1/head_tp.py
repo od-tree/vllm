@@ -53,7 +53,9 @@ class DecodePolicy:
 
     def __init__(self, options):
         self.threshold = int(options.get("min_context", 0))
-        self.tile = options.get("tile", "minimax")
+        self.tile = options.get(
+            "tile", "work" if options.get("admission") == "load" else "minimax"
+        )
         if self.tile not in ("minimax", "one", "work"):
             raise ValueError("head_tp.tile must be minimax, one or work")
 

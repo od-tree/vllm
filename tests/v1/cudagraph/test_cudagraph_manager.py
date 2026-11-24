@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -60,6 +60,77 @@ def _create_vllm_config() -> MagicMock:
     vllm_config.num_speculative_tokens = 0
     vllm_config.use_cumem_cudagraph_pool = False
     return vllm_config
+
+
+def test_head_tp_captures_separate_native_and_packed_keys(monkeypatch):
+    monkeypatch.setattr(
+        gpu_cudagraph_utils,
+        "get_pp_group",
+        lambda: SimpleNamespace(is_first_rank=True, is_last_rank=True),
+    )
+    monkeypatch.setattr(
+        gpu_cudagraph_utils.current_platform, "get_global_graph_pool", lambda: None
+    )
+    manager = gpu_cudagraph_utils.ModelCudaGraphManager(
+        _create_vllm_config(),
+        torch.device("cpu"),
+        CUDAGraphMode.FULL_DECODE_ONLY,
+        decode_query_len=1,
+    )
+    (native,) = manager._capture_descs[CUDAGraphMode.FULL]
+    manager.configure_head_tp(object())
+    assert manager._capture_descs[CUDAGraphMode.FULL] == [
+        native,
+        native.for_packed_decode(),
+    ]
+    assert not native.packed_heads
+    assert native.for_packed_decode().packed_heads
+    assert manager._candidates[(4, 0)] == [native]
+
+    # Exercise the real capture catalogue and DP dispatch while replacing
+    # the CUDA driver and the remote rank's contribution to the collective.
+    with (
+        patch.object(gpu_cudagraph_utils, "current_stream", return_value=None),
+        patch.object(
+            gpu_cudagraph_utils.current_platform,
+            "get_global_graph_pool",
+            return_value=object(),
+        ),
+        patch.object(
+            gpu_cudagraph_utils.current_platform,
+            "graph_pool_handle",
+            return_value=object(),
+        ),
+        patch.object(
+            gpu_cudagraph_utils,
+            "graph_capture",
+            return_value=nullcontext(SimpleNamespace(stream=None)),
+        ),
+        patch.object(gpu_cudagraph_utils, "get_offloader"),
+        patch.object(torch.cuda, "CUDAGraph", side_effect=lambda: MagicMock()),
+        patch.object(torch.cuda, "graph", side_effect=lambda *a, **kw: nullcontext()),
+    ):
+        gpu_cudagraph_utils.CudaGraphManager.capture(
+            manager, lambda desc, warmup: lambda mode: None
+        )
+
+    for peer_has_packed in (False, True, False):
+
+        def add_peer_vote(tensor, packed=peer_has_packed):
+            tensor[:, 1] = tensor[:, 0]
+            tensor[7, 1] = int(packed)
+
+        with patch.object(
+            dp_utils,
+            "get_dp_group",
+            return_value=SimpleNamespace(cpu_all_reduce_=add_peer_vote),
+        ):
+            desc, sync = dispatch_cg_and_sync_dp(
+                manager, 1, 1, 1, 2, 0, needs_packed_kv=False
+            )
+        assert desc == (native.for_packed_decode() if peer_has_packed else native)
+        assert sync.needs_packed_kv == peer_has_packed
+        assert desc in manager.graphs
 
 
 def test_full_capture_sets_graph_pool_id_before_cuda_graph(monkeypatch):
