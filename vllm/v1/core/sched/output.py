@@ -327,6 +327,8 @@ class SchedulerOutput:
 
     # Head collaboration for this step. None keeps every rank on local attention.
     head_tp_step: HeadTPStep | None = None
+    # Starting KV position and scheduled query count for the packed owner.
+    packed_route: tuple[int, int] | None = None
 
     @classmethod
     def make_empty(cls) -> "SchedulerOutput":

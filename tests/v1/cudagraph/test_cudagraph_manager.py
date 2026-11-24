@@ -119,6 +119,7 @@ def test_head_tp_captures_separate_native_and_packed_keys(monkeypatch):
         def add_peer_vote(tensor, packed=peer_has_packed):
             tensor[:, 1] = tensor[:, 0]
             tensor[7, 1] = int(packed)
+            tensor[8, 1] = 109042 if packed else -1
 
         with patch.object(
             dp_utils,
@@ -126,10 +127,12 @@ def test_head_tp_captures_separate_native_and_packed_keys(monkeypatch):
             return_value=SimpleNamespace(cpu_all_reduce_=add_peer_vote),
         ):
             desc, sync = dispatch_cg_and_sync_dp(
-                manager, 1, 1, 1, 2, 0, needs_packed_kv=False
+                manager, 1, 1, 1, 2, 0, packed_route=(-1, 0)
             )
         assert desc == (native.for_packed_decode() if peer_has_packed else native)
         assert sync.needs_packed_kv == peer_has_packed
+        peer = (109042, 1) if peer_has_packed else (-1, 0)
+        assert sync.packed_routes == ((-1, 0), peer)
         assert desc in manager.graphs
 
 

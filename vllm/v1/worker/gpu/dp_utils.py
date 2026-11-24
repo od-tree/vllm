@@ -45,6 +45,7 @@ class DPSyncState:
     # step's drafts, so all ranks skip drafting together.
     skip_drafts: bool = False
     needs_packed_kv: bool = False
+    packed_routes: tuple[tuple[int, int], ...] = ()
 
 
 def sync_cudagraph_and_dp_padding(
@@ -62,15 +63,17 @@ def sync_cudagraph_and_dp_padding(
     uniform_decode: bool = False,
     allow_skip_drafts: bool = False,
     needs_packed_kv: bool | None = None,
+    packed_route: tuple[int, int] | None = None,
 ) -> tuple[BatchExecutionDescriptor, DPSyncState | None]:
     """Coordinates the batch descriptor and DP padding across all ranks.
 
     Returns (synced_batch_desc, sync). `sync` is None when no rank has work.
     """
     assert dp_size > 1, "DP size must be greater than 1"
-    tensor = torch.zeros(
-        7 if needs_packed_kv is None else 8, dp_size, dtype=torch.int32, device="cpu"
-    )
+    width = 7 if needs_packed_kv is None else 8
+    if packed_route is not None:
+        width = 9
+    tensor = torch.zeros(width, dp_size, dtype=torch.int32, device="cpu")
     tensor[0][dp_rank] = num_tokens
     tensor[1][dp_rank] = desired_batch_desc.cg_mode.value
     tensor[2][dp_rank] = uniform_token_count or 0  # (0 means None)
@@ -80,6 +83,8 @@ def sync_cudagraph_and_dp_padding(
     tensor[6][dp_rank] = int(allow_skip_drafts)
     if needs_packed_kv is not None:
         tensor[7][dp_rank] = int(needs_packed_kv)
+    if packed_route is not None:
+        tensor[8, dp_rank], tensor[7, dp_rank] = packed_route
     if should_skip_dp_coordination():
         tensor[:] = tensor[:, dp_rank, None].clone()
     else:
@@ -88,6 +93,11 @@ def sync_cudagraph_and_dp_padding(
     # Full width, dead slots included: returned in DPSyncState, whose
     # consumers index it by original dp_rank.
     num_tokens_across_dp_full = tensor[0]
+    routes = (
+        tuple(zip(tensor[8].tolist(), tensor[7].tolist()))
+        if packed_route is not None
+        else ()
+    )
 
     if parallel_config is not None and parallel_config.enable_fault_tolerance:
         # Per-step barrier over the TP cpu group: a faulted sibling stops
@@ -110,7 +120,7 @@ def sync_cudagraph_and_dp_padding(
     allow_ubatching_across_dp = tensor[4]
     num_reqs_across_dp = tensor[5]
     allow_skip_drafts_across_dp = tensor[6]
-    packed = needs_packed_kv is not None and bool(tensor[7].any())
+    packed = width >= 8 and bool(tensor[7].any())
     skip_drafts = bool(torch.all(allow_skip_drafts_across_dp == 1))
 
     # If ranks disagree on the uniform token count, or its 0 (means None) set to None
@@ -184,6 +194,7 @@ def sync_cudagraph_and_dp_padding(
                 num_reqs=int(num_reqs_across_dp.max()),
                 skip_drafts=skip_drafts,
                 needs_packed_kv=packed,
+                packed_routes=routes,
             )
 
     synced_cg_mode = CUDAGraphMode(int(cg_mode_across_dp.min()))
@@ -215,6 +226,7 @@ def sync_cudagraph_and_dp_padding(
                 num_reqs=int(num_reqs_across_dp.max()),
                 skip_drafts=skip_drafts,
                 needs_packed_kv=packed,
+                packed_routes=routes,
             ),
         )
 
@@ -249,6 +261,7 @@ def sync_cudagraph_and_dp_padding(
         num_reqs=int(num_reqs_across_dp.max()),
         skip_drafts=skip_drafts,
         needs_packed_kv=packed,
+        packed_routes=routes,
     )
 
 
@@ -268,6 +281,7 @@ def dispatch_cg_and_sync_dp(
     allow_skip_drafts: bool = False,
     dp_sync_state: DPSyncState | None = None,
     needs_packed_kv: bool | None = None,
+    packed_route: tuple[int, int] | None = None,
 ) -> tuple[BatchExecutionDescriptor, DPSyncState | None]:
     """Pick a cudagraph descriptor for this batch, agreeing it across DP ranks.
 
@@ -303,7 +317,9 @@ def dispatch_cg_and_sync_dp(
             none of its requests can use this step's drafts. Agreed across ranks
             (all must allow it) into `DPSyncState.skip_drafts`.
         needs_packed_kv: Whether this rank scheduled a packed request. None
-            disables the head-TP vote for deployments without this feature.
+            disables the vote unless packed_route is supplied.
+        packed_route: Scheduled (KV position, token count) on this rank.
+            For packed deployments an idle rank contributes (-1, 0).
         dp_sync_state: Agreement from a prior dispatch over this same batch, to reuse.
             Must come from a batch with this same padded `num_tokens` and the
             same `uniform_token_count`; `num_reqs` may differ, as neither
@@ -376,4 +392,5 @@ def dispatch_cg_and_sync_dp(
         uniform_decode=uniform_decode,
         allow_skip_drafts=allow_skip_drafts,
         needs_packed_kv=needs_packed_kv,
+        packed_route=packed_route,
     )

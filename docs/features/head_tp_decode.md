@@ -88,8 +88,11 @@ mode. Quantify the selector with matched native, local, longest and load runs.
 
 When head-TP is enabled, the V2 runner captures native and packed versions
 of each uniform single-token FULL graph bucket. The existing DP padding
-handshake carries an extra vote for a scheduled packed request. A vote from
-either owner selects the packed path on both ranks (including a dummy helper).
+handshake carries the packed owner's starting KV position and scheduled token
+count from the native scheduler output. A positive count from either owner
+selects the packed path on both ranks (including a dummy helper) and supplies
+the peer route for that step. The load and local admission policies exchange
+candidate and lease capacity data together before native KV allocation.
 With no votes the runner uses native attention and KV writes, skipping
 head-TP staging and its two per-layer exchanges. The enabled scheduler still
 coordinates layouts on the host and the second graph uses extra capture memory.

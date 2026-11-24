@@ -252,7 +252,9 @@ class HeadTPDecode:
             + 2 * self.head_ids[None, None, : self.half]
         ).reshape(-1, self.half)
 
-    def stage(self, rows, seq_lens, b, table, *, counts=None, mixed=False):
+    def stage(
+        self, rows, seq_lens, b, table, *, counts=None, mixed=False, peer_route=None
+    ):
         self.step += 1
         peer = 1 - self.rank
         idx = next(
@@ -262,9 +264,12 @@ class HeadTPDecode:
         pos = rows[idx].position if idx is not None else -1
         counts = [1] * len(rows) if counts is None else counts
         nq = counts[idx] if idx is not None else 0
-        routes = [None, None]
-        dist.all_gather_object(routes, (pos, nq), group=self.cpu_group)
-        peer_pos, peer_q = routes[peer]
+        if peer_route is None:
+            # Standalone operator callers do not run the vLLM DP handshake.
+            routes = [None, None]
+            dist.all_gather_object(routes, (pos, nq), group=self.cpu_group)
+            peer_route = routes[peer]
+        peer_pos, peer_q = peer_route
         if peer_q and self.resident[peer] is None:
             raise RuntimeError("peer is using an unallocated head shard")
         self.mixed = mixed

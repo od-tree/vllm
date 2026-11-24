@@ -1930,6 +1930,14 @@ class Scheduler(SchedulerInterface):
         else:
             head_tp_step = None
 
+        packed_id = self.kv_cache_manager.packed_request
+        packed_route = None
+        if packed_id is not None and packed_id in num_scheduled_tokens:
+            packed_route = (
+                self.requests[packed_id].num_computed_tokens,
+                num_scheduled_tokens[packed_id],
+            )
+
         scheduler_output = SchedulerOutput(
             scheduled_new_reqs=new_reqs_data,
             scheduled_cached_reqs=cached_reqs_data,
@@ -1956,6 +1964,7 @@ class Scheduler(SchedulerInterface):
             skip_drafts=not drafts_needed,
             ec_manager_metadata=self.encoder_cache_manager.get_manager_metadata(),
             head_tp_step=head_tp_step,
+            packed_route=packed_route,
         )
 
         # NOTE(Kuntai): this function is designed for multiple purposes:

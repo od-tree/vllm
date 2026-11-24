@@ -1898,14 +1898,11 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             skip_compiled = True
 
         decode = getattr(self, "head_tp_decode", None)
-        needs_packed_kv = None
+        packed_route = None
         if decode is not None:
-            resident = decode.resident[self.dp_rank]
-            needs_packed_kv = (
-                not dummy_run
-                and resident is not None
-                and scheduler_output.num_scheduled_tokens.get(resident, 0) > 0
-            )
+            packed_route = (-1, 0)
+            if not dummy_run and scheduler_output.packed_route is not None:
+                packed_route = scheduler_output.packed_route
 
         batch_desc, dp_sync_state = dispatch_cg_and_sync_dp(
             self.cudagraph_manager,
@@ -1923,7 +1920,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             ),
             uniform_decode=uniform_tok_count == self.decode_query_len,
             allow_skip_drafts=scheduler_output.skip_drafts,
-            needs_packed_kv=needs_packed_kv,
+            packed_route=packed_route,
         )
 
         if batch_desc.num_tokens == 0:
@@ -2054,6 +2051,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                     block_tables[0],
                     counts=counts,
                     mixed=not uniform,
+                    peer_route=dp_sync_state.packed_routes[1 - self.dp_rank],
                 )
 
         attn_metadata = None

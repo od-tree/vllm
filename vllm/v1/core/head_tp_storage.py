@@ -83,15 +83,10 @@ class PackedKVCoordinator:
 
     def advance(self):
         sched = self.engine.scheduler
-        requests = {
-            r.request_id: r
-            for r in sched.requests.values()
-            if r.status
-            in (RequestStatus.RUNNING, RequestStatus.WAITING, RequestStatus.PREEMPTED)
-        }
+        requests = sched.requests
         self.step += 1
         old = self.leases[self.rank].request
-        prior = sched.requests.get(old)
+        prior = requests.get(old)
         if prior is not None and (
             prior.is_finished() or prior.status == RequestStatus.PREEMPTED
         ):
@@ -99,49 +94,38 @@ class PackedKVCoordinator:
         # A waiting request that cannot be scheduled yet must not strand KV
         # on both workers while the head of the waiting queue needs memory.
         front = sched.waiting.peek_request() if sched.waiting else None
-        ready = [
-            r
-            for r in requests.values()
-            if r.status == RequestStatus.RUNNING or r is front
-        ]
-        rows = [
-            DecodeRow(r.request_id, max(r.num_computed_tokens, r.num_prompt_tokens))
-            for r in ready
-            if r.num_tokens <= self.limit
-        ]
+        if front is not None and front.status not in (
+            RequestStatus.WAITING,
+            RequestStatus.PREEMPTED,
+        ):
+            front = None
+        if self.admission == "longest":
+            # Custom selectors historically received rows in request insertion order.
+            ready = [
+                r
+                for r in requests.values()
+                if r.status == RequestStatus.RUNNING or r is front
+            ]
+        else:
+            ready = [r for r in sched.running if r.status == RequestStatus.RUNNING]
+            if front is not None:
+                ready.append(front)
         required = None
         if (
-            old in requests
-            and prior
+            prior is not None
+            and prior.status in (RequestStatus.RUNNING, RequestStatus.WAITING)
             and 0 < prior.num_computed_tokens < prior.num_prompt_tokens
         ):
             required = old
         mandatory = [
-            r.req_id for r in rows if r.position > self.manager.head_tp_dense_limit
+            r.request_id
+            for r in ready
+            if r.num_tokens <= self.limit
+            and max(r.num_computed_tokens, r.num_prompt_tokens)
+            > self.manager.head_tp_dense_limit
         ]
         if mandatory:
             required = old if old in mandatory else mandatory[0]
-
-        if self.admission == "longest":
-            loads = self.gather([r.position for r in rows])
-            choice = self.policy.select(
-                rows,
-                peer_positions=loads[1 - self.rank],
-                rank=self.rank,
-                step=self.step,
-            )
-            if choice is not None and choice not in {r.req_id for r in rows}:
-                raise ValueError("head_tp policy selected an ineligible request")
-            if required is not None:
-                choice = required
-        else:
-            choices = self._joint_choices(ready, required)
-            if all(req is None for req in choices) and all(
-                lease.request is None for lease in self.leases
-            ):
-                return
-            choice = choices[self.rank]
-        target = requests.get(choice)
 
         def describe(r):
             if r is None:
@@ -161,9 +145,57 @@ class PackedKVCoordinator:
                 cdiv(bound, 2 * self.block),
             )
 
-        states = self.gather(
-            (describe(prior), describe(target), self.pool.get_num_free_blocks())
-        )
+        if self.admission == "longest":
+            rows = [
+                DecodeRow(r.request_id, max(r.num_computed_tokens, r.num_prompt_tokens))
+                for r in ready
+                if r.num_tokens <= self.limit
+            ]
+            loads = self.gather([r.position for r in rows])
+            choice = self.policy.select(
+                rows,
+                peer_positions=loads[1 - self.rank],
+                rank=self.rank,
+                step=self.step,
+            )
+            if choice is not None and choice not in {r.req_id for r in rows}:
+                raise ValueError("head_tp policy selected an ineligible request")
+            if required is not None:
+                choice = required
+            states = self.gather(
+                (
+                    describe(prior),
+                    describe(requests.get(choice)),
+                    self.pool.get_num_free_blocks(),
+                )
+            )
+        else:
+            # Both ranks can derive the selected target's allocation from this
+            # same pre-allocation snapshot, including when a forced lease wins.
+            candidates = []
+            if self.admission == "load":
+                candidates = [
+                    (
+                        describe(r),
+                        max(r.num_computed_tokens, r.num_prompt_tokens),
+                        max(0, r.max_tokens - r.num_output_tokens),
+                        r.num_tokens <= self.limit,
+                    )
+                    for r in ready
+                ]
+            snapshots = self.gather(
+                (
+                    describe(prior),
+                    describe(requests.get(required)),
+                    self.pool.get_num_free_blocks(),
+                    candidates,
+                )
+            )
+            states = self._joint_lease_states(snapshots)
+            if not any(target for _, target, _ in states) and not any(
+                lease.request for lease in self.leases
+            ):
+                return
         # Promise space for accepted requests without allocating future pages.
         # Both schedulers must protect the same remaining growth; otherwise two
         # partial prefills can occupy the pool and repeatedly preempt each other.
@@ -250,34 +282,27 @@ class PackedKVCoordinator:
             lease.budget - len(lease.blocks) for lease in self.leases
         )
 
-    def _joint_choices(self, ready, required):
-        # Ineligible dense requests still contribute to rank load.
-        snapshot = []
-        if self.admission == "load":
-            snapshot = [
-                (
-                    r.request_id,
-                    max(r.num_computed_tokens, r.num_prompt_tokens),
-                    r.num_computed_tokens,
-                    max(0, r.max_tokens - r.num_output_tokens),
-                    r.num_tokens <= self.limit,
-                )
-                for r in ready
+    def _joint_lease_states(self, snapshots):
+        states = [[prior, forced, free] for prior, forced, free, _ in snapshots]
+        if self.admission == "local" or any(forced for _, forced, _ in states):
+            return states
+        batches = [
+            [
+                AdmissionRow(info[0], length, info[1], remaining, eligible)
+                for info, length, remaining, eligible in candidates
             ]
-        states = self.gather((snapshot, required))
-        choices = [force for _, force in states]
-        if self.admission == "local" or any(req is not None for req in choices):
-            return choices
-        batches = [[AdmissionRow(*row) for row in batch] for batch, _ in states]
+            for _, _, _, candidates in snapshots
+        ]
         residents = [lease.request for lease in self.leases]
         selected = self.cost_model.choose(batches, residents)
         if selected is not None:
             owner, request = selected
-            # Retire the other direction first. If memory pressure prevents
-            # unpacking, preserve the resident layout and reconsider next step.
+            # Unpack the opposite direction before admitting a new owner.
             if residents[1 - owner] is None:
-                choices[owner] = request
-        return choices
+                states[owner][1] = next(
+                    info for info, *_ in snapshots[owner][3] if info[0] == request
+                )
+        return states
 
     def release_finished(self):
         if not any(lease.request for lease in self.leases):
