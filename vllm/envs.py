@@ -292,6 +292,7 @@ if TYPE_CHECKING:
     VLLM_SYSTEM_START_DATE: str | None = None
     VLLM_TOOL_JSON_ERROR_AUTOMATIC_RETRY: bool = False
     VLLM_CUSTOM_SCOPES_FOR_PROFILING: bool = False
+    VLLM_HEAD_TP_PROFILE_DIR: str | None = None
     VLLM_NVTX_SCOPES_FOR_PROFILING: bool = False
     VLLM_KV_EVENTS_USE_INT_BLOCK_HASHES: bool = True
     VLLM_OBJECT_STORAGE_SHM_BUFFER_NAME: str = "VLLM_OBJECT_STORAGE_SHM_BUFFER"
@@ -2082,6 +2083,7 @@ environment_variables: dict[str, Callable[[], Any]] = {
         int(os.getenv("VLLM_CUSTOM_SCOPES_FOR_PROFILING", "0"))
     ),
     # Add optional nvtx scopes for profiling, disable to avoid overheads
+    "VLLM_HEAD_TP_PROFILE_DIR": lambda: os.getenv("VLLM_HEAD_TP_PROFILE_DIR"),
     "VLLM_NVTX_SCOPES_FOR_PROFILING": lambda: bool(
         int(os.getenv("VLLM_NVTX_SCOPES_FOR_PROFILING", "0"))
     ),
@@ -2492,6 +2494,7 @@ def compile_factors() -> dict[str, object]:
         "VLLM_NO_USAGE_STATS",
         "VLLM_DO_NOT_TRACK",
         "VLLM_LOGGING_LEVEL",
+        "VLLM_HEAD_TP_PROFILE_DIR",
         "VLLM_LOGGING_PREFIX",
         "VLLM_LOGGING_STREAM",
         "VLLM_LOGGING_CONFIG_PATH",

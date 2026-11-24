@@ -10,6 +10,7 @@ import torch.distributed as dist
 from vllm.logger import init_logger
 from vllm.utils.import_utils import resolve_obj_by_qualname
 from vllm.utils.math_utils import cdiv
+from vllm.v1 import head_tp_profile as profile
 from vllm.v1.head_tp import DecodePolicy, DecodeRow
 from vllm.v1.head_tp_admission import AdmissionRow, LoadAdmission
 from vllm.v1.kv_cache_interface import AttentionSpec, iter_layer_specs
@@ -69,17 +70,25 @@ class PackedKVCoordinator:
 
     def gather(self, value):
         # The engine's stateless Gloo group need not be in c10d's global registry.
+        stamp = profile.start()
         raw = json.dumps(value).encode()
         n = torch.tensor([len(raw)], dtype=torch.int64)
         sizes = [torch.empty_like(n) for _ in self.leases]
+        stamp = profile.finish("encode", self.rank, stamp)
         dist.all_gather(sizes, n, group=self.group)
+        stamp = profile.finish("gather_sizes", self.rank, stamp)
         buf = torch.zeros(max(int(s.item()) for s in sizes), dtype=torch.uint8)
         buf[: len(raw)] = torch.tensor(list(raw), dtype=torch.uint8)
         parts = [torch.empty_like(buf) for _ in sizes]
+        stamp = profile.finish("pack_payload", self.rank, stamp)
         dist.all_gather(parts, buf, group=self.group)
-        return [
+        stamp = profile.finish("gather_payload", self.rank, stamp)
+        result = [
             json.loads(bytes(p[: int(s.item())].tolist())) for p, s in zip(parts, sizes)
         ]
+
+        profile.finish("unpack_payload", self.rank, stamp)
+        return result
 
     def advance(self):
         sched = self.engine.scheduler
@@ -183,6 +192,7 @@ class PackedKVCoordinator:
                     )
                     for r in ready
                 ]
+            gather_start = profile.start()
             snapshots = self.gather(
                 (
                     describe(prior),
@@ -191,7 +201,9 @@ class PackedKVCoordinator:
                     candidates,
                 )
             )
+            choose_start = profile.finish("snapshot", self.rank, gather_start)
             states = self._joint_lease_states(snapshots)
+            profile.finish("choose", self.rank, choose_start)
             if not any(target for _, target, _ in states) and not any(
                 lease.request for lease in self.leases
             ):

@@ -12,6 +12,7 @@ import torch.distributed as dist
 
 from vllm.logger import init_logger
 from vllm.utils.math_utils import cdiv
+from vllm.v1 import head_tp_profile as profile
 from vllm.v1.head_tp import DecodePolicy as DecodePolicy
 from vllm.v1.head_tp import DecodeRow as DecodeRow
 
@@ -255,6 +256,7 @@ class HeadTPDecode:
     def stage(
         self, rows, seq_lens, b, table, *, counts=None, mixed=False, peer_route=None
     ):
+        stamp = profile.start()
         self.step += 1
         peer = 1 - self.rank
         idx = next(
@@ -313,6 +315,7 @@ class HeadTPDecode:
             self.table[local_groups : local_groups + self.half, :n].copy_(address[:n].T)
             self.remote_pages.copy_(address[peer_pos // self.block])
             self.offset.fill_(peer_pos % self.block)
+        stamp = profile.finish("mapping", self.rank, stamp)
         lengths = [r.position + 1 for r in rows] + [max(1, peer_pos + 1)]
         heads = [self.half if i == idx else self.h for i in range(len(rows))] + [
             self.half
@@ -332,9 +335,12 @@ class HeadTPDecode:
             raise ValueError("head_tp policy returned invalid split counts")
         splits = [n for n in counts[:-1] for _ in range(self.h)]
         splits += [1] * ((b - len(rows)) * self.h) + [counts[-1]] * self.half
+        stamp = profile.finish("split_plan", self.rank, stamp)
         self.splits[: len(splits)].copy_(torch.tensor(splits, dtype=torch.int32))
 
+        stamp = profile.finish("split_upload", self.rank, stamp)
         self.prepare_decode_metadata(b, return_row=idx)
+        profile.finish("decode_metadata", self.rank, stamp)
 
     def prepare_decode_metadata(self, batch_size, *, return_row=None):
         """Stage one rank-local FA3 launch plan before executing any layer."""

@@ -53,6 +53,7 @@ from vllm.utils.hashing import get_hash_fn_by_name
 from vllm.utils.network_utils import make_zmq_socket
 from vllm.utils.system_utils import decorate_logs, set_process_title
 from vllm.utils.watch_dog import get_watch_dog, start_watch_dog
+from vllm.v1 import head_tp_profile as profile
 from vllm.v1.attention.backends.utils import resolve_kv_cache_layout
 from vllm.v1.core import kv_cache_utils
 from vllm.v1.core.kv_cache_planning import (
@@ -2670,7 +2671,9 @@ class DPEngineCoreProc(EngineCoreProc):
             if self.packed_kv is not None and (
                 self.engines_running or self.scheduler.has_requests()
             ):
+                advance_start = profile.start()
                 self.packed_kv.advance()
+                profile.finish("advance", self.dp_rank, advance_start)
             executed = self._process_engine_step()
             self._maybe_publish_request_counts()
 

@@ -402,3 +402,56 @@ local GPU time independently for DP and head-TP. Their medians are
 `dp_minus_sharded_us` estimates the compute time saved by splitting heads.
 Q routing, KV writes, NCCL and output assembly are outside the timed region.
 Earlier files containing `full_minus_sharded_us` used a consolidated batch.
+
+## Profile a serving step
+
+Set `VLLM_HEAD_TP_PROFILE_DIR` in the server environment to a fresh directory
+per run. Both the native DP baseline and the V2 packed worker use this switch.
+The engine and worker processes write separate `steps-<pid>.jsonl` files with
+DP rank, monotonic start time and elapsed milliseconds. The profile is off by
+default. Use a local filesystem and run the client on the same machine for
+comparison by timestamp.
+
+For the two-rank mixed workload, start the desired server configuration and run:
+
+```bash
+python benchmarks/kernels/head_tp/bench_serving_batch.py \
+  --case mixed4x2 --trace head_tp_eval/replays/qwen3-original-v1/issue05.csv.gz \
+  > client.jsonl
+python benchmarks/kernels/head_tp/summarize_step_profile.py \
+  "$VLLM_HEAD_TP_PROFILE_DIR" client.jsonl --case mixed4x2 --packed
+```
+
+Omit `--packed` for native DP or local-only admission. The summary selects the
+longest overlapping stable window on both ranks within each measured round,
+checks actual row counts, context lengths and layout, and trims boundary steps.
+`wall_ms` measures replay start to replay start. CUDA events measure FULL model
+replay and the gap before the next replay on the worker stream. Events are read
+after completion without synchronizing each decode step. The gap can include
+other GPU work and waiting for the next submission. CPU measurements cover
+scheduling, admission, snapshot serialization and Gloo collectives, graph
+dispatch, input and block-table preparation, and packed route staging.
+Parent stages include their children, and both ranks may wait in the same
+collective. Compare per-rank durations and retain unprofiled runs for absolute
+performance claims.
+
+On dual RTX 5090, the Qwen3-30B-A3B-Instruct-2507-FP8 random-weight
+`mixed4x2` run used a 109,042-token prompt plus three short requests on the
+owner and four short requests on the helper. The 5090 test checkout used
+the experimentally tuned FA2 dispatch (32 native splits, 64 packed splits).
+The table gives owner milliseconds per step, averaging the three round means.
+Each round covered 107–109 steady intervals; all input and output hashes
+matched. One local-only round timed out and was repeated after restarting.
+
+| Mode | FULL replay | Replay gap | Wall |
+| --- | ---: | ---: | ---: |
+| Native DP | 17.37 | 2.80 | 20.17 |
+| Local admission | 17.32 | 4.02 | 21.34 |
+| Load admission | 15.56 | 4.49 | 20.05 |
+
+Load admission spent 1.34 ms in the engine coordinator, including 1.25 ms in
+the snapshot exchange and 0.038 ms choosing the lease. The size and payload
+collectives took 0.41 and 0.50 ms including peer wait. The worker spent
+0.38 ms staging packed metadata, including 0.24 ms on route and page mapping.
+The 1.82 ms replay saving largely offset the 1.69 ms additional gap. The
+three native and load wall-time ranges overlapped.

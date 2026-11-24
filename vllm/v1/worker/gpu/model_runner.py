@@ -71,6 +71,7 @@ from vllm.tasks import SupportedTask
 from vllm.utils.gc_utils import freeze_gc_for_cudagraph_capture
 from vllm.utils.mem_utils import DeviceMemoryProfiler, format_gib
 from vllm.utils.torch_utils import STR_DTYPE_TO_TORCH_DTYPE, async_tensor_h2d
+from vllm.v1 import head_tp_profile as profile
 from vllm.v1.core.sched.output import GrammarOutput, SchedulerOutput
 from vllm.v1.kv_cache_interface import (
     KVCacheConfig,
@@ -330,6 +331,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.pooling_runner: PoolingRunner | None = None
 
         self.step_timing = StepTimingCollector()
+        self.replay_profile = profile.ReplayProfile() if profile.DIRECTORY else None
         self.adaptive_verification: AdaptiveVerificationManager | None = None
         self.input_buffers = InputBuffers(
             max_num_reqs=self.max_num_reqs,
@@ -1904,6 +1906,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             if not dummy_run and scheduler_output.packed_route is not None:
                 packed_route = scheduler_output.packed_route
 
+        stamp = profile.start()
         batch_desc, dp_sync_state = dispatch_cg_and_sync_dp(
             self.cudagraph_manager,
             num_reqs,
@@ -1923,6 +1926,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             packed_route=packed_route,
         )
 
+        profile.finish("dispatch", self.dp_rank, stamp)
         if batch_desc.num_tokens == 0:
             # All DP ranks have zero tokens to run.
             empty_output = self.kv_connector.no_forward(scheduler_output)
@@ -1935,10 +1939,13 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             if self.observability_config.cudagraph_metrics:
                 cudagraph_stats = make_cudagraph_stats(batch_desc, num_toks)
             assert batch_req_state is not None
+            stamp = profile.start()
             input_batch = self.prepare_inputs(
                 scheduler_output, batch_req_state, batch_desc, num_active_loras
             )
+            stamp = profile.finish("prepare_inputs", self.dp_rank, stamp)
             block_tables, slot_mappings = self.prepare_attn(input_batch)
+            profile.finish("prepare_attn", self.dp_rank, stamp)
             # Mamba "align" pre-copy: migrate recurrent state across block
             # boundaries before the forward. Runs only on real batches, and
             # before model_state.prepare_attn gathers num_accepted_tokens so the
@@ -2044,6 +2051,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                     if dummy_run
                     else input_batch.num_scheduled_tokens[: len(rows)].tolist()
                 )
+                stage_start = profile.start()
                 decode.stage(
                     rows,
                     input_batch.seq_lens,
@@ -2053,6 +2061,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                     mixed=not uniform,
                     peer_route=dp_sync_state.packed_routes[1 - self.dp_rank],
                 )
+                profile.finish("stage", self.dp_rank, stage_start)
 
         attn_metadata = None
         slot_mappings_by_layer = None
@@ -2193,7 +2202,16 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.kv_connector.pre_forward(
                 scheduler_output, input_batch, attn_metadata=attn_metadata
             )
-            model_output = self.cudagraph_manager.run_fullgraph(batch_desc)
+            if self.replay_profile is None:
+                model_output = self.cudagraph_manager.run_fullgraph(batch_desc)
+            else:
+                model_output = self.replay_profile.replay(
+                    self.cudagraph_manager,
+                    batch_desc,
+                    input_batch,
+                    self.dp_rank,
+                    dummy_run,
+                )
         else:
             # For piecewise and eager mode, just call model().
             batch_descriptor = BatchDescriptor(
@@ -2562,6 +2580,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         """Release GPU tensors (model weights, KV caches, workspace) so that
         memory is reclaimable when running in the same process."""
         torch.accelerator.synchronize()
+        if self.replay_profile is not None:
+            self.replay_profile.drain(self.dp_rank)
         if current_platform.is_rocm():
             # RCCL's ncclCommAbort waits for live graphs that captured the comm:
             # https://github.com/ROCm/rocm-systems/issues/13018

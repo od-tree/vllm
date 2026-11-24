@@ -33,6 +33,7 @@ from vllm.multimodal.inputs import MultiModalKwargsItem
 from vllm.multimodal.utils import get_mm_features_in_window
 from vllm.outputs import RequestError
 from vllm.utils.math_utils import cdiv
+from vllm.v1 import head_tp_profile as profile
 from vllm.v1.core.encoder_cache_manager import (
     EncoderCacheManager,
     EncoderDecoderCacheManager,
@@ -899,6 +900,7 @@ class Scheduler(SchedulerInterface):
         return max(num_new_tokens, 0)
 
     def schedule(self, throttle_prefills: bool = False) -> SchedulerOutput:
+        sched_start = profile.start()
         self.current_step += 1
         # NOTE(woosuk) on the scheduling algorithm:
         # There's no "decoding phase" nor "prefill phase" in the scheduler.
@@ -1999,6 +2001,10 @@ class Scheduler(SchedulerInterface):
 
         with record_function_or_nullcontext("schedule: update_after_schedule"):
             self._update_after_schedule(scheduler_output)
+        if sched_start is not None:
+            profile.finish(
+                "schedule", self.parallel_config.data_parallel_rank, sched_start
+            )
         return scheduler_output
 
     def _build_kv_connector_meta(

@@ -79,7 +79,11 @@ def main():
     ap.add_argument("--trace", type=Path, required=True, help="Frozen issue05.csv.gz")
     ap.add_argument("--url", default="http://127.0.0.1:18548")
     ap.add_argument("--model", default="qwen-2507")
-    ap.add_argument("--repeats", type=int, default=3, help="Measured rounds after warmup")
+    ap.add_argument(
+        "--repeats", type=int, default=3, help="Measured rounds after warmup"
+    )
+    cases = ("short4x2", "mixed4_idle", "mixed4x2")
+    ap.add_argument("--case", choices=cases, help="Run a single batch shape")
     args = ap.parse_args()
     if args.repeats < 1:
         ap.error("--repeats must be positive")
@@ -92,7 +96,7 @@ def main():
             if int(r["row"]) in (LONG, *SHORT)
         }
     for rep in range(args.repeats + 1):
-        for case in ("short4x2", "mixed4_idle", "mixed4x2"):
+        for case in (args.case,) if args.case else cases:
             jobs = []
             with ThreadPoolExecutor(8) as pool:
                 if case.startswith("mixed"):
@@ -100,7 +104,7 @@ def main():
                     anchor = pool.submit(
                         request_one, args.url, args.model, rows[LONG], 0, ready
                     )
-                    anchor.add_done_callback(lambda _: ready.set())
+                    anchor.add_done_callback(lambda _, event=ready: event.set())
                     jobs.append(anchor)
                     # Submit the background at the same decode boundary in both
                     # modes, so it cannot finish during the anchor's long prefill.
