@@ -274,6 +274,25 @@ def test_dplb_non_late_interaction_still_uses_lb():
     assert client.lb_engines[1][0] == 1
 
 
+@pytest.mark.parametrize("explicit", [True, False])
+def test_load_hint_follows_routed_owner_and_respects_live_lease(explicit):
+    from vllm.v1.head_tp_admission import LoadAdmission
+
+    client = _make_dplb_client(num_engines=2)
+    client.frontend_admission = LoadAdmission({"kv_tokens_per_us": 10}, 1024)
+    client.head_tp_limit = 4096
+    client.lb_engines = [[2, 2, 0.3, 400, 100, False], [0, 0, 0, 0, 0, False]]
+    request = make_request(SamplingParams(max_tokens=32), [10] * 3072)
+    request.data_parallel_rank = 0 if explicit else None
+    owner = 0 if explicit else 1
+    assert client.get_core_engine_for_request(request) == client.core_engines[owner]
+    assert request.head_tp_helper_rank == 1 - owner
+    client.lb_engines[owner][5] = True
+    other = make_request(SamplingParams(max_tokens=32), [10] * 3072)
+    client.get_core_engine_for_request(other)
+    assert other.head_tp_helper_rank is None
+
+
 def test_dplb_in_flight_request_stays_on_same_engine():
     client = _make_dplb_client()
     request = make_request(SamplingParams(max_tokens=1))

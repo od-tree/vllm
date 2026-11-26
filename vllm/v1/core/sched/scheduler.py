@@ -1305,6 +1305,16 @@ class Scheduler(SchedulerInterface):
                     skip_request(request_queue)
                     continue
 
+                kv = self.kv_cache_manager
+                if (
+                    kv.head_tp_offers is not None
+                    and request_id != kv.packed_request
+                    and (request.head_tp_proposed or kv.requires_packed_kv(request))
+                ):
+                    kv.head_tp_offers[request_id] = None
+                    skip_request(request_queue)
+                    continue
+
                 num_external_computed_tokens = 0
                 load_kv_async = False
                 connector_prefix_cache_queries, connector_prefix_cache_hits = 0, 0

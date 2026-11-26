@@ -2476,6 +2476,8 @@ class DPEngineCoreProc(EngineCoreProc):
 
         opts = decode_options(vllm_config)
         self.packed_kv = PackedKVCoordinator(self, opts) if opts is not None else None
+        self.next_head_tp_report = 0.0
+        self.last_head_tp_load = None
         self._attach_head_tp_wire()
 
     def _attach_head_tp_wire(self) -> None:
@@ -2619,13 +2621,32 @@ class DPEngineCoreProc(EngineCoreProc):
         # Publish our request counts (if they've changed), stamped with the
         # lockstep-synchronized step counter and wave number.
         counts = self.scheduler.get_request_counts()
-        if counts != self.last_counts:
+        load = None
+        if self.packed_kv is not None and self.packed_kv.frontend:
+            now = time.monotonic()
+            if counts == self.last_counts and now < self.next_head_tp_report:
+                return
+            lengths = [
+                max(r.num_prompt_tokens, r.num_computed_tokens)
+                for r in self.scheduler.running
+            ]
+            load = (
+                sum(lengths),
+                max(lengths, default=0),
+                any(lease.request is not None for lease in self.packed_kv.leases),
+            )
+            self.next_head_tp_report = now + 0.1
+            if counts == self.last_counts and load == self.last_head_tp_load:
+                return
+            self.last_head_tp_load = load
+        if counts != self.last_counts or load is not None:
             self.last_counts = counts
             stats = SchedulerStats(
                 *counts,
                 kv_cache_usage=self.scheduler.get_kv_cache_usage(),
                 step_counter=self.step_counter,
                 current_wave=self.current_wave,
+                head_tp_load=load,
             )
             self.output_queue.put_nowait((-1, EngineCoreOutputs(scheduler_stats=stats)))
 
@@ -2668,7 +2689,7 @@ class DPEngineCoreProc(EngineCoreProc):
                 elif not state.commit_requested and state.is_ready_for_switch():
                     self.process_input_queue_block = True
 
-            if self.packed_kv is not None and (
+            if self.packed_kv is not None and not self.packed_kv.frontend and (
                 self.engines_running or self.scheduler.has_requests()
             ):
                 advance_start = profile.start()
@@ -2701,7 +2722,7 @@ class DPEngineCoreProc(EngineCoreProc):
             )
 
             if not self.engines_running:
-                if self.packed_kv is not None:
+                if self.packed_kv is not None and not self.packed_kv.frontend:
                     self.packed_kv.release_finished()
                 if self.dp_rank == 0 or not self.has_coordinator:
                     # Notify client that we are pausing the loop.
@@ -2744,11 +2765,24 @@ class DPEngineCoreProc(EngineCoreProc):
             return True
 
         parallel_config = self.vllm_config.parallel_config
+        event = (
+            self.packed_kv.admission_event()
+            if self.packed_kv is not None and self.packed_kv.frontend
+            else None
+        )
         has_unfinished, pause_consensus = parallel_config.sync_dp_state(
             self.dp_group,
             has_unfinished=local_unfinished,
             pending_pause=self.pending_pause,
+            head_tp_event=event,
         )
+        if event is not None and event.item():
+            stamp = profile.start()
+            self.packed_kv.confirm_offers()
+            profile.finish("confirm_offers", self.dp_rank, stamp)
+            # Publish committed lease changes before an idle engine goes to sleep.
+            self.next_head_tp_report = 0.0
+            self._maybe_publish_request_counts()
 
         if pause_consensus:
             self.ignore_start_dp_wave = True

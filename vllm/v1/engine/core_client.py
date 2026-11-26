@@ -1545,7 +1545,8 @@ class DPAsyncMPClient(AsyncMPClient):
             renderer,
         )
 
-        # List of [waiting, running, kv_cache_usage] per engine.
+        # [waiting, running, kv_cache_usage] with optional Head-TP context
+        # sum, context maximum, and occupied-lease flag.
         # Used only by DPLBAsyncMPClient subclass.
         self.lb_engines: list[list[int | float]] = [
             [0, 0, 0.0] for _ in self.core_engines
@@ -1789,11 +1790,27 @@ class DPLBAsyncMPClient(DPAsyncMPClient):
         )
 
         assert len(self.core_engines) > 1
+        from vllm.v1.head_tp import frontend_load_options
+        from vllm.v1.head_tp_admission import LoadAdmission
+
+        options = frontend_load_options(vllm_config)
+        if options is not None:
+            text = vllm_config.model_config.hf_text_config
+            shard_bytes = (
+                2 * text.num_key_value_heads * vllm_config.model_config.get_head_size()
+            )
+            self.frontend_admission = LoadAdmission(options, shard_bytes)
+            self.head_tp_limit = min(
+                vllm_config.model_config.max_model_len,
+                int(options.get("max_context", vllm_config.model_config.max_model_len)),
+            )
         self._prepared_elastic_ep: tuple[int, int] | None = None
 
         self.eng_start_index = (
             len(self.core_engines) * self.client_index
         ) // client_count
+
+    frontend_admission = None
 
     def get_core_engine_for_request(self, request: EngineCoreRequest) -> EngineIdentity:
         if request.resumable:
@@ -1821,7 +1838,7 @@ class DPLBAsyncMPClient(DPAsyncMPClient):
                 # Start from client_index to help with balancing when engines
                 # are empty.
                 idx = (self.eng_start_index + i) % num_engines
-                waiting, running, kv_cache_usage = current_counts[idx]
+                waiting, running, kv_cache_usage = current_counts[idx][:3]
                 # Estimate engine load as the greater of the coordinator's
                 # latest (waiting + running) snapshot and this client's own
                 # in-flight count (scaled by the number of clients). The
@@ -1852,6 +1869,39 @@ class DPLBAsyncMPClient(DPAsyncMPClient):
             # scores actually differ.
             self.eng_start_index = (self.eng_start_index + 1) % num_engines
 
+        request.head_tp_helper_rank = None
+        policy = self.frontend_admission
+        if (
+            policy is not None
+            and request.sampling_params is not None
+            and not request.resumable
+        ):
+            from vllm.utils import length_from_prompt_token_ids_or_embeds
+
+            length = length_from_prompt_token_ids_or_embeds(
+                request.prompt_token_ids, request.prompt_embeds
+            )
+            contexts = [int(s[3]) if len(s) >= 6 else 0 for s in self.lb_engines]
+            occupied = any(len(s) >= 6 and s[5] for s in self.lb_engines)
+            if (
+                not occupied
+                and length <= self.head_tp_limit
+                and policy.suggest(
+                    contexts,
+                    eng_index,
+                    length,
+                    request.sampling_params.max_tokens
+                    or self.vllm_config.model_config.max_model_len,
+                )
+            ):
+                request.head_tp_helper_rank = 1 - eng_index
+                logger.debug(
+                    "Head-TP proposal owner=%d helper=%d prompt=%d contexts=%s",
+                    eng_index,
+                    request.head_tp_helper_rank,
+                    length,
+                    contexts,
+                )
         chosen_engine = self.core_engines[eng_index]
         # Record which engine is chosen for this request, to handle aborts.
         self.reqs_in_flight[request.request_id] = chosen_engine

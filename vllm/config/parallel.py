@@ -958,15 +958,23 @@ class ParallelConfig:
         return aggregated_has_unfinished
 
     def sync_dp_state(
-        self, dp_group: ProcessGroup, has_unfinished: bool, pending_pause: bool
+        self,
+        dp_group: ProcessGroup,
+        has_unfinished: bool,
+        pending_pause: bool,
+        *,
+        head_tp_event: torch.Tensor | None = None,
     ) -> tuple[bool, bool]:
         """Combined all-reduce for DP state synchronization.
 
-        Uses a single SUM all-reduce on a 2-element tensor:
+        Uses a single SUM all-reduce on the wave state:
           [0] = 1 if this rank has unfinished work, else 0.
                 SUM > 0 ≡ logical OR across ranks → any rank has work.
           [1] = 1 if this rank has a pending pause request, else 0.
                 SUM == dp_size ≡ all ranks reached pause consensus.
+
+        When supplied, head_tp_event is a scalar int32 CPU tensor. Its flag
+        travels in the third element and receives the sum across ranks.
 
         has_unfinished_global is true if any rank has unfinished work,
         or if some ranks are waiting for a pause consensus.
@@ -978,7 +986,11 @@ class ParallelConfig:
         tensor = torch.tensor(
             [int(has_unfinished), int(pending_pause)], dtype=torch.int32, device="cpu"
         )
+        if head_tp_event is not None:
+            tensor = torch.cat((tensor, head_tp_event.reshape(1)))
         cpu_all_reduce_(tensor, dp_group, timeout=self.cpu_distributed_timeout)
+        if head_tp_event is not None:
+            head_tp_event.copy_(tensor[2])
         dp_size = dp_group.size()
         pause_count = tensor[1].item()
         has_unfinished_global = tensor[0].item() > 0 or pause_count % dp_size != 0

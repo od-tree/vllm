@@ -11,7 +11,7 @@ from vllm.logger import init_logger
 from vllm.utils.import_utils import resolve_obj_by_qualname
 from vllm.utils.math_utils import cdiv
 from vllm.v1 import head_tp_profile as profile
-from vllm.v1.head_tp import DecodePolicy, DecodeRow
+from vllm.v1.head_tp import DecodePolicy, DecodeRow, frontend_load_options
 from vllm.v1.head_tp_admission import AdmissionRow, LoadAdmission
 from vllm.v1.kv_cache_interface import AttentionSpec, iter_layer_specs
 from vllm.v1.request import RequestStatus
@@ -24,6 +24,20 @@ class Lease:
     request: str | None = None
     blocks: list = field(default_factory=list)
     budget: int = 0
+
+
+def prefill_candidates(running, front):
+    """Keep decode rows out of selection, but restore a preempted packed owner."""
+    candidates = [
+        req
+        for req in running
+        if not req.num_output_tokens and req.num_computed_tokens < req.num_prompt_tokens
+    ]
+    if front is not None and (
+        not front.num_output_tokens or front.head_tp_repack_on_resume
+    ):
+        candidates.append(front)
+    return candidates
 
 
 class PackedKVCoordinator:
@@ -65,8 +79,126 @@ class PackedKVCoordinator:
                 * spec.dtype.itemsize
             )
             self.cost_model = LoadAdmission(options, shard_bytes)
+        self.frontend = (
+            engine.publish_dp_lb_stats
+            and frontend_load_options(engine.vllm_config) is not None
+        )
+        if self.frontend:
+            self.manager.head_tp_offers = {}
         self.leases = [Lease(), Lease()]
         self.step = 0
+
+    def _has_live_owner(self):
+        request = self.engine.scheduler.requests.get(self.leases[self.rank].request)
+        return (
+            request is not None
+            and not request.is_finished()
+            and request.status != RequestStatus.PREEMPTED
+        )
+
+    def admission_event(self):
+        released = (
+            self.leases[self.rank].request is not None and not self._has_live_owner()
+        )
+        return torch.tensor(
+            int(released or bool(self.manager.head_tp_offers)), dtype=torch.int32
+        )
+
+    def confirm_offers(self):
+        """Both engines enter only after the native wave sync reports an event."""
+        sched = self.engine.scheduler
+        pending = self.manager.head_tp_offers
+        assert pending is not None
+        offer = None
+        for req_id in list(pending):
+            req = sched.requests.get(req_id)
+            if req is None or req.status not in (
+                RequestStatus.WAITING,
+                RequestStatus.PREEMPTED,
+            ):
+                del pending[req_id]
+                continue
+            required = self.manager.requires_packed_kv(req)
+            bound = (
+                self.manager.max_model_len
+                if req.resumable
+                else min(
+                    self.manager.max_model_len, req.num_prompt_tokens + req.max_tokens
+                )
+            )
+            candidate = (
+                req_id,
+                cdiv(bound, 2 * self.block),
+                required,
+                req.num_prompt_tokens,
+            )
+            if offer is None or (required, req.num_prompt_tokens) > (
+                offer[2],
+                offer[3],
+            ):
+                offer = candidate
+        # Pass unselected optional prefills back to native scheduling immediately.
+        # Mandatory ones remain queued until capacity and a lease are available.
+        for req_id in list(pending):
+            req = sched.requests[req_id]
+            if (
+                offer is None or req_id != offer[0]
+            ) and not self.manager.requires_packed_kv(req):
+                req.head_tp_proposed = False
+                del pending[req_id]
+
+        states = self.gather(
+            (self._has_live_owner(), offer, self.pool.get_num_free_blocks())
+        )
+        free = min(state[2] for state in states)
+        for owner, (alive, _, _) in enumerate(states):
+            lease = self.leases[owner]
+            if lease.request is not None and not alive:
+                self._publish("drop", owner, lease, [], 0)
+                self.pool.free_blocks(lease.blocks)
+                free += len(lease.blocks)
+                self.leases[owner] = Lease()
+                if owner == self.rank:
+                    self.manager.packed_request = None
+                    self.manager.packed_capacity = 0
+
+        # Capacity-mandated requests win, then longer prompts and lower rank.
+        offers = [
+            (owner, candidate)
+            for owner, (_, candidate, _) in enumerate(states)
+            if candidate is not None
+        ]
+        for owner, (req_id, pages, required, _) in sorted(
+            offers, key=lambda item: (not item[1][2], -item[1][3], item[0])
+        ):
+            if owner == self.rank:
+                pending.pop(req_id, None)
+                sched.requests[req_id].head_tp_proposed = False
+            if (
+                self.leases[owner].request is not None
+                or pages > free
+                or (
+                    not required
+                    and any(lease.request is not None for lease in self.leases)
+                )
+            ):
+                continue
+            # Reserve the whole declared budget, so growth needs no per-step vote.
+            lease = Lease(req_id, self.pool.get_new_blocks(pages), pages)
+            self._publish("pack", owner, lease, [], 0)
+            self.leases[owner] = lease
+            if owner == self.rank:
+                self.manager.packed_request = req_id
+                self.manager.packed_capacity = pages * 2 * self.block
+                sched.requests[req_id].head_tp_repack_on_resume = True
+                logger.info(
+                    "Head-TP prefill admitted owner=%d helper=%d mandatory=%s pages=%d",
+                    owner,
+                    1 - owner,
+                    required,
+                    pages,
+                )
+            free -= pages
 
     def gather(self, value):
         # The engine's stateless Gloo group need not be in c10d's global registry.
@@ -108,33 +240,7 @@ class PackedKVCoordinator:
             RequestStatus.PREEMPTED,
         ):
             front = None
-        if self.admission == "longest":
-            # Custom selectors historically received rows in request insertion order.
-            ready = [
-                r
-                for r in requests.values()
-                if r.status == RequestStatus.RUNNING or r is front
-            ]
-        else:
-            ready = [r for r in sched.running if r.status == RequestStatus.RUNNING]
-            if front is not None:
-                ready.append(front)
-        required = None
-        if (
-            prior is not None
-            and prior.status in (RequestStatus.RUNNING, RequestStatus.WAITING)
-            and 0 < prior.num_computed_tokens < prior.num_prompt_tokens
-        ):
-            required = old
-        mandatory = [
-            r.request_id
-            for r in ready
-            if r.num_tokens <= self.limit
-            and max(r.num_computed_tokens, r.num_prompt_tokens)
-            > self.manager.head_tp_dense_limit
-        ]
-        if mandatory:
-            required = old if old in mandatory else mandatory[0]
+        prefill = prefill_candidates(sched.running, front)
 
         def describe(r):
             if r is None:
@@ -154,13 +260,70 @@ class PackedKVCoordinator:
                 cdiv(bound, 2 * self.block),
             )
 
+        pinned = prior is not None and (
+            prior.num_output_tokens > 0
+            or prior.num_computed_tokens > 0
+            or prior is front
+        )
+        lease = self.leases[self.rank]
+        prior_info = describe(prior)
+        maintenance = old is not None and (
+            not pinned
+            or prior_info[2] > len(lease.blocks) * 2 * self.block
+            or prior_info[3] > lease.budget
+        )
+        # All engines vote in the same order, including an idle helper.
+        # Normal decode sends no candidate lists and never calls the policy.
+        consider = bool(prefill) and not pinned
+        if self.admission == "local":
+            consider = consider and any(
+                self.manager.requires_packed_kv(r) for r in prefill
+            )
+        flags = torch.tensor([consider, maintenance], dtype=torch.int32)
+        dist.all_reduce(flags, op=dist.ReduceOp.MAX, group=self.group)
+        choose, maintain = flags.tolist()
+        if not choose and not maintain:
+            return
+        eligible = {r.request_id for r in prefill} if not pinned else set()
         if self.admission == "longest":
+            # Custom selectors historically received rows in request insertion order.
+            ready = [
+                r
+                for r in requests.values()
+                if r.status == RequestStatus.RUNNING or r is front
+            ]
+        else:
+            ready = [r for r in sched.running if r.status == RequestStatus.RUNNING]
+            if front is not None:
+                ready.append(front)
+        required = old if pinned else None
+        if required is None:
+            required = next(
+                (r.request_id for r in prefill if self.manager.requires_packed_kv(r)),
+                None,
+            )
+
+        if not choose:
+            states = self.gather(
+                (
+                    prior_info,
+                    prior_info if pinned else None,
+                    self.pool.get_num_free_blocks(),
+                )
+            )
+        elif self.admission == "longest":
             rows = [
                 DecodeRow(r.request_id, max(r.num_computed_tokens, r.num_prompt_tokens))
                 for r in ready
-                if r.num_tokens <= self.limit
+                if r.num_tokens <= self.limit and r.request_id in eligible
             ]
-            loads = self.gather([r.position for r in rows])
+            loads = self.gather(
+                [
+                    max(r.num_computed_tokens, r.num_prompt_tokens)
+                    for r in ready
+                    if r.num_tokens <= self.limit
+                ]
+            )
             choice = self.policy.select(
                 rows,
                 peer_positions=loads[1 - self.rank],
@@ -173,7 +336,7 @@ class PackedKVCoordinator:
                 choice = required
             states = self.gather(
                 (
-                    describe(prior),
+                    prior_info,
                     describe(requests.get(choice)),
                     self.pool.get_num_free_blocks(),
                 )
@@ -188,14 +351,14 @@ class PackedKVCoordinator:
                         describe(r),
                         max(r.num_computed_tokens, r.num_prompt_tokens),
                         max(0, r.max_tokens - r.num_output_tokens),
-                        r.num_tokens <= self.limit,
+                        r.num_tokens <= self.limit and r.request_id in eligible,
                     )
                     for r in ready
                 ]
             gather_start = profile.start()
             snapshots = self.gather(
                 (
-                    describe(prior),
+                    prior_info,
                     describe(requests.get(required)),
                     self.pool.get_num_free_blocks(),
                     candidates,
@@ -231,35 +394,10 @@ class PackedKVCoordinator:
                     self.local.free(self.manager.packed_request)
                     self.manager.packed_request = None
                     self.manager.packed_capacity = 0
-            if lease.request and (
-                target_info is None or lease.request != target_info[0]
-            ):
-                pos = old_info[1]
-                dense_count = cdiv(pos, self.block)
-                used = cdiv(pos, 2 * self.block)
-                extra = dense_count - used
-                if free[owner] + lease.budget - len(lease.blocks) < extra:
-                    target_info = old_info  # retain the authoritative shards
-                else:
-                    dense = []
-                    if self.rank == owner:
-                        added = iter(self.pool.get_new_blocks(extra))
-                        dense = [
-                            lease.blocks[i // 2] if i % 2 == 0 else next(added)
-                            for i in range(dense_count)
-                        ]
-                    self._publish("unpack", owner, lease, dense, pos)
-                    if self.rank == owner:
-                        self._replace_local(lease.request, dense)
-                        self.pool.free_blocks(lease.blocks[used:])
-                        self.manager.packed_request = None
-                    else:
-                        self.pool.free_blocks(lease.blocks)
-                    free[owner] += lease.budget - used - extra
-                    free[1 - owner] += lease.budget
-                    lease.blocks = []
-                    lease.budget = 0
-                    lease.request = None
+            # A surviving lease must be retained, including on maintenance-only steps.
+            assert not lease.request or (
+                target_info and target_info[0] == lease.request
+            )
             if target_info is None:
                 continue
             req, pos, end, budget = target_info
@@ -287,6 +425,7 @@ class PackedKVCoordinator:
                 self._replace_local(req, [self.pool.null_block] * cdiv(pos, self.block))
                 self.pool.free_blocks(reversed(dense))
                 self.manager.packed_request = req
+                requests[req].head_tp_repack_on_resume = True
             if self.rank == owner:
                 self.manager.packed_capacity = len(lease.blocks) * 2 * self.block
 

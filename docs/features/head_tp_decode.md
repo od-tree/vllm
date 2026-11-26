@@ -55,7 +55,7 @@ slot entries for packed requests refer to the null block. During decode the
 writer routes those tokens to their packed pages. Mixed prefill masks their
 native slot writes. Partial-head pages do not enter the prefix cache.
 
-## Change the decision during decode
+## Choose the parallel layout during prefill
 
 The `head_tp.admission` option controls placement:
 
@@ -63,9 +63,30 @@ The `head_tp.admission` option controls placement:
 | --- | --- |
 | `longest` (default) | Use the existing longest-row rule or the custom policy's `select` method. |
 | `local` | Keep optional requests local. This is the feature-on control for measuring host coordination overhead. |
-| `load` | Compare native DP with one candidate head split on either rank using a common snapshot. |
+| `load` | Score an arriving prompt for head splitting. Two-rank internal serving proposes the helper in the frontend and reserves pages at the engines. |
 
-The load policy adds each running request's context length and the front waiting
+For the Python internal load balancer with two fixed DP ranks, owner selection
+still follows native routing, including explicit rank headers and session
+affinity. Engine statistics also carry the sum and maximum active context
+length and lease occupancy. The frontend uses the context sums and the
+incoming prompt to estimate the change in the slower rank's work. A positive
+estimate with sufficient projected savings yields a helper hint. Statistics
+are asynchronous and idle capacity can be taken by other clients.
+
+The native scheduler passes local prefills through and holds proposed or
+capacity-mandated requests before allocating their first KV slots. The engine
+piggybacks an admission/release flag on its existing global DP wave sync
+(step one and every `dp_sync_interval` steps). On an event each rank supplies
+at most one queued offer and its current free page count. Both ranks confirm
+the same winner, reserve the declared packed page budget up front, and
+execute the first prompt chunk with that layout. Optional rejected offers
+resume locally; capacity-mandated ones wait. This avoids a separate per-step
+placement collective. A proposal arriving between sync points may wait for
+the next one. Ordinary output streaming is supported; resumable input
+sessions do not receive optional hints. External/hybrid, elastic and
+engine-only deployments retain engine-side selection.
+
+The engine-side fallback adds each running request's context length and the front waiting
 request's length on each rank. For a candidate of length L, moving L/2 units
 of work from its owner to its peer changes the maximum of the two rank loads.
 The estimated saving per layer and per step is the reduction in that maximum
@@ -79,8 +100,8 @@ a prospective return at `return_fraction` of the estimated copy cost.
 Initial values are 1400 full-head tokens/µs, 32 µs, 64 steps, 8 GB/s and
 0 respectively. The first two approximate the H100 work64 full-layer data.
 The bandwidth estimate uses an earlier warm one-layer migration (about 145 MB
-in 18 ms). Zero prospective return assumes completion while packed. An actual
-decision to unpack always pays the estimated return cost. Calibrate these
+in 18 ms). Zero prospective return assumes completion while packed. Decode-time
+exit scoring is reserved for a future migration planner. Calibrate these
 estimates for the deployment, particularly on the 5090 or with different tiles.
 This models decode and KV movement; it does not predict prefill service time.
 Chunked-prefill pinning and capacity-mandated splits take precedence in every
@@ -109,14 +130,16 @@ runs, including disabling async scheduling in the native baseline.
 `head_tp.policy_class` accepts the fully qualified Python class name of a
 policy available on both workers. Its constructor receives the head_tp options.
 It can subclass `DecodePolicy` in `vllm.v1.worker.gpu.head_tp_decode`.
-In longest-row mode the DP engine invokes the custom selector before scheduling.
-The load and local modes use their built-in joint selector. The worker chooses splits
+In longest-row mode the DP engine invokes the custom selector at prefill
+admission events before scheduling.
+The load and local modes use their built-in joint selector. The FA3 worker chooses row splits
 outside graph capture for each decode. Policy instances in the engine and
 worker have separate state.
 
 - `select(rows, *, peer_positions, rank, step)` receives local eligible
   `DecodeRow(req_id, position)` objects and the peer's batch history lengths.
-  During admission the candidate length includes the prompt. Return a local
+  Only prefill candidates are eligible; a preempted packed owner must restore
+  its original layout. The position used for admission includes the prompt. Return a local
   request ID or `None`. The default selects the longest eligible
   local request at or above `min_context`. This is a forced-collaboration
   policy for experiments.
@@ -132,15 +155,42 @@ worker have separate state.
   count, and splits each row just enough to meet that target chunk size,
   up to the captured bound. The legacy longest-row mode defaults to `minimax`.
 
-A request admitted as packed stores its two halves directly, including during
-chunked prefill. Entering from dense layout migrates the prefix in bounded
-chunks before releasing the old dense blocks. Leaving copies back the remote
-heads and reuses the packed owner pages for even logical blocks. When expansion
-would exceed the available pool budget, the request keeps its packed layout.
-The engine holds each layout through an in-progress chunked prefill. Requests
-too large for full-head storage require packed admission. Transitions run at
-completed scheduling boundaries with one model step in flight. The MoE batch
-continues to contain only the rank's own tokens.
+A request can enter packed layout on its first prefill chunk. A selected
+request stays packed throughout decode; a local decode stays local. On
+preemption its KV can be discarded, but the original packed placement is
+required before resuming. A request whose declared length bound exceeds
+dense KV capacity must acquire a lease before it runs. The engine-side fallback votes on
+whether prefill admission or lease maintenance is due. A steady decode step
+bypasses the detailed snapshot and placement policy. Page growth, release,
+the worker route handshake and FA tile selection continue to run as needed.
+The earlier measurements below are retained for comparison.
+
+### Proposed asynchronous migration during decode (design only)
+
+A future policy can compute proposals off the decode critical path and review
+them at a shared step interval (initial experiment: every 16 completed decode
+steps). The proposal carries the request identity, layout version and KV
+frontier. At an agreed boundary the ranks validate the version, request
+liveness and capacity. A pending or stale proposal leaves the committed route
+in force. No decode-time planner, timer or background copy runs in this version.
+
+For a later dense-to-packed transition, the owner's existing LBHNC cache can
+be viewed as `[4P, 256, 1, 256]` for the Qwen3 configuration. Map heads 0/1
+directly to virtual slots `4*p+h` of each original dense page. Copy only
+heads 2/3 to compact pages on the helper. This avoids a second owner-side
+packed history; the original pages still occupy whole blocks. A 109,042-token
+history then keeps 426 original pages on the owner instead of temporarily
+adding 213 packed ones. A two-head allocation unit would also permit returning
+the migrated half to the pool, at the cost of changing allocation and native
+FA addressing.
+
+During copying, pin the source and destination pages and keep decoding on the
+old route. Copy sealed history, then dual-write or catch up tokens beyond the
+copy frontier. Both ranks must agree on the activation step after the final
+writes complete. Aborts, preemptions or layout version changes invalidate
+pending proposals; recycle pages only after outstanding readers and copies
+finish. Evaluate page-address stability, peak live pages, post-cutover token
+equality and stalls separately from steady decode throughput.
 
 ### Decode Q/K/V staging
 
@@ -455,3 +505,32 @@ collectives took 0.41 and 0.50 ms including peer wait. The worker spent
 0.38 ms staging packed metadata, including 0.24 ms on route and page mapping.
 The 1.82 ms replay saving largely offset the 1.69 ms additional gap. The
 three native and load wall-time ranges overlapped.
+
+### Fixed decode placement on two RTX 5090s
+
+On the same frozen `mixed4x2` requests and FA2 configuration, both Head-TP
+versions packed the long request at position zero in every round. The following
+owner timings are means of three round means after one warmup, using the
+overlapping four-request decode batches on each rank (107–109 intervals per
+round). The three modes were run sequentially on the same machine. All
+per-request input and output token hashes matched native DP.
+
+| Mode | FULL replay (ms) | Replay gap (ms) | Step (ms) |
+| --- | ---: | ---: | ---: |
+| Native DP | 17.32 | 2.54 | 19.86 |
+| Head-TP with per-step reselection | 15.55 | 4.25 | 19.81 |
+| Head-TP with fixed decode placement | 15.54 | 3.81 | 19.35 |
+
+The fixed-layout path took zero full admission snapshots in all three steady
+windows; the previous path took 107, 107 and 109. Engine coordination averaged
+0.53 ms versus 1.28 ms previously. The two-rank event vote and KV growth and
+release coordination are still active.
+
+With the frontend proposal and wave-sync confirmation path, a follow-up run
+of the same workload measured 15.60 ms FULL replay, 3.16 ms replay gap and
+18.76 ms wall per step on the owner. The paired native DP run measured 17.33,
+2.68 and 20.01 ms respectively. Each mode ran one warmup and three measured
+rounds. There were zero lease confirmations during all three stable mixed
+decode windows. The pinned test and a separate run using automatic owner
+routing both packed at position zero and matched the reference output token
+hashes. Automatic routing was a correctness check; the timings use fixed owners.

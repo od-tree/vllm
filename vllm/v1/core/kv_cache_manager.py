@@ -196,6 +196,9 @@ class KVCacheManager:
                 if isinstance(manager, MambaManager):
                     manager.shared_prefix_checkpoint = True
         self.num_kv_cache_groups = len(kv_cache_config.kv_cache_groups)
+        # Internal LB load admission holds only proposed or capacity-mandated
+        # prefills until the two engines have confirmed physical pages.
+        self.head_tp_offers: dict[str, None] | None = None
         self.packed_request: str | None = None
         self.packed_capacity = 0
         self.packed_growth_reserve = 0
@@ -251,6 +254,13 @@ class KVCacheManager:
         stats = self.prefix_cache_stats
         self.prefix_cache_stats = PrefixCacheStats()
         return stats
+
+    def requires_packed_kv(self, request: Request) -> bool:
+        if self.head_tp_dense_limit is None:
+            return False
+        # A local decode cannot switch later if its output outgrows this pool.
+        bound = min(self.max_model_len, request.num_prompt_tokens + request.max_tokens)
+        return request.head_tp_repack_on_resume or bound > self.head_tp_dense_limit
 
     def prefix_cache_lookup_enabled(self, request: Request) -> bool:
         """Whether a local prefix cache lookup may be run for this request."""
@@ -494,9 +504,8 @@ class KVCacheManager:
             )
 
         if (
-            self.head_tp_dense_limit is not None
-            and request.request_id != self.packed_request
-            and request.num_tokens > self.head_tp_dense_limit
+            request.request_id != self.packed_request
+            and self.requires_packed_kv(request)
         ):
             return None
         if request.request_id == self.packed_request:

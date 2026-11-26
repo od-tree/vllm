@@ -404,6 +404,8 @@ class DPCoordinatorProc:
                         stats[0] = scheduler_stats.num_waiting_reqs
                         stats[1] = scheduler_stats.num_running_reqs
                         stats[2] = scheduler_stats.kv_cache_usage
+                        if scheduler_stats.head_tp_load is not None:
+                            stats[3:] = scheduler_stats.head_tp_load
                         stats_changed = True
 
                     # Wave coordination: handle wave completion and start notifications

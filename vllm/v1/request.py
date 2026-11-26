@@ -82,6 +82,7 @@ class Request:
         abort_immediately: bool = False,
         kv_hints: KvHintsEnvelope | None = None,
         block_hashes: list["BlockHash"] | None = None,
+        head_tp_proposed: bool = False,
     ) -> None:
         self.request_id = request_id
         self.client_index = client_index
@@ -201,6 +202,8 @@ class Request:
 
         # True if this request is scheduled as a non-final prefill chunk.
         self.is_prefill_chunk = False
+        self.head_tp_repack_on_resume = False
+        self.head_tp_proposed = head_tp_proposed
 
         # Block-aligned token position of a proven shared prefix worth pinning
         # in the (sparse) prefix cache; 0 means none. Set at admission for
@@ -283,6 +286,7 @@ class Request:
             reasoning_parser_kwargs=request.reasoning_parser_kwargs,
             abort_immediately=request.abort_immediately,
             block_hashes=block_hashes,
+            head_tp_proposed=request.head_tp_helper_rank is not None,
         )
 
     def append_output_token_ids(

@@ -4,6 +4,7 @@
 import torch
 
 from vllm import SamplingParams
+from vllm.v1.core.head_tp_storage import prefill_candidates
 from vllm.v1.engine import EngineCoreRequest
 from vllm.v1.head_tp import (
     HeadTPLoadTracker,
@@ -81,6 +82,23 @@ def _publish(request: Request, **overrides):
         {request.request_id: 1},
         **args,
     )
+
+
+def test_packed_selection_preserves_prefill_and_excludes_decode_rows():
+    waiting = _request("waiting")
+    waiting.num_computed_tokens = 0
+    chunk = _request("chunk")
+    chunk.num_computed_tokens = 4
+    decoding = _request("decoding")
+    decoding.append_output_token_ids(7)
+    assert prefill_candidates([decoding, chunk], waiting) == [chunk, waiting]
+    assert prefill_candidates([decoding], None) == []
+
+    # Recomputing old decode KV must preserve its layout.
+    decoding.num_computed_tokens = 0
+    assert prefill_candidates([], decoding) == []
+    decoding.head_tp_repack_on_resume = True
+    assert prefill_candidates([], decoding) == [decoding]
 
 
 def test_legal_degrees_skip_values_that_do_not_divide_kv_heads():

@@ -40,6 +40,12 @@ class LoadAdmission:
             raise ValueError("Invalid head_tp load admission cost parameters")
         self.copy_us_per_token = shard_bytes_per_token / (1000 * bandwidth)
 
+    def suggest(self, contexts, owner, length, remaining):
+        # Only aggregate background work is needed for an arriving prompt.
+        batches = [[AdmissionRow("", total, 0, 0, False)] for total in contexts]
+        batches[owner].append(AdmissionRow("new", length, 0, remaining, True))
+        return self.choose(batches, [None, None]) is not None
+
     def choose(
         self, batches: Sequence[Sequence[AdmissionRow]], residents: Sequence[str | None]
     ) -> tuple[int, str] | None:

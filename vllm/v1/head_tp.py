@@ -42,6 +42,22 @@ def decode_options(config: VllmConfig) -> dict[str, Any] | None:
     return opts if opts.get("enabled", False) else None
 
 
+def frontend_load_options(config: VllmConfig) -> dict[str, Any] | None:
+    """Two-rank internal routing with a fixed pair of engines."""
+    options = decode_options(config)
+    parallel = config.parallel_config
+    if (
+        options
+        and options.get("admission") == "load"
+        and parallel.data_parallel_size == 2
+        and not parallel.data_parallel_external_lb
+        and not parallel.data_parallel_hybrid_lb
+        and not parallel.enable_elastic_ep
+    ):
+        return options
+    return None
+
+
 @dataclass(frozen=True)
 class DecodeRow:
     req_id: str

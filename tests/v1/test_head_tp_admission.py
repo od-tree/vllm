@@ -61,3 +61,35 @@ def test_best_candidate_can_be_shorter_than_the_longest_request():
         [row("bg", 200000, eligible=False)],
     ]
     assert policy.choose(batches, [None, None]) == (0, "better")
+
+
+@pytest.mark.parametrize("owner", [0, 1])
+def test_frontend_uses_context_work_for_the_selected_owner(owner):
+    policy = LoadAdmission({}, 1024)
+    contexts = [0, 0]
+    assert policy.suggest(contexts, owner, 109042, 120)
+    contexts[1 - owner] = 109042
+    assert not policy.suggest(contexts, owner, 109042, 120)
+    assert not policy.suggest([0, 0], owner, 256, 120)
+
+
+def test_helper_rank_zero_survives_engine_request_conversion():
+    from vllm import SamplingParams
+    from vllm.v1.engine import EngineCoreRequest
+    from vllm.v1.request import Request
+
+    message = EngineCoreRequest(
+        request_id="req",
+        prompt_token_ids=[1, 2],
+        mm_features=None,
+        sampling_params=SamplingParams(max_tokens=8),
+        pooling_params=None,
+        arrival_time=0.0,
+        lora_request=None,
+        cache_salt=None,
+        data_parallel_rank=1,
+        head_tp_helper_rank=0,
+    )
+    assert Request.from_engine_core_request(message, block_hasher=None).head_tp_proposed
+    message.head_tp_helper_rank = None
+    assert not Request.from_engine_core_request(message, block_hasher=None).head_tp_proposed

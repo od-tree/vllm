@@ -254,6 +254,9 @@ class SchedulerStats:
 
     perf_stats: PerfStats | None = None
 
+    # Active context sum, longest context, and packed lease occupancy.
+    head_tp_load: tuple[int, int, bool] | None = None
+
 
 @dataclass
 class RequestStateStats:
