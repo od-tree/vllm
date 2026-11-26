@@ -132,6 +132,7 @@ class HeadTPDecode:
         self.mixed = False
         self.group = device_group
         self.cpu_group = cpu_group
+        self._mapping_key = None
         self.columns = cdiv(self.max_len, self.block)
         rows = max_rows * self.h + self.half
         # One worker stream consumes these buffers sequentially across layers.
@@ -169,6 +170,7 @@ class HeadTPDecode:
 
     def change_layout(self, action, owner, req_id, packed, dense, position):
         """Acknowledge migration before the allocator recycles source pages."""
+        self._mapping_key = None
         old = self.physical[owner]
         if action in ("pack", "unpack") and position:
             # A physical page owns 2 consecutive logical blocks per local head.
@@ -254,7 +256,16 @@ class HeadTPDecode:
         ).reshape(-1, self.half)
 
     def stage(
-        self, rows, seq_lens, b, table, *, counts=None, mixed=False, peer_route=None
+        self,
+        rows,
+        seq_lens,
+        b,
+        table,
+        *,
+        counts=None,
+        mixed=False,
+        peer_route=None,
+        table_revision=None,
     ):
         stamp = profile.start()
         self.step += 1
@@ -276,46 +287,75 @@ class HeadTPDecode:
             raise RuntimeError("peer is using an unallocated head shard")
         self.mixed = mixed
         if mixed:
+            self._mapping_key = None
             self.mixed_args = rows, counts, idx, table, peer_pos, peer_q
             self.write_mask = torch.zeros(b, dtype=torch.bool, device=self.device)
             if idx is not None:
                 begin = sum(counts[:idx])
                 self.write_mask[begin : begin + nq] = True
             return
-        self.row.fill_(idx if idx is not None else 0)
-        self.local_mask.zero_()
         self.write_mask = self.local_mask
         local_groups = b * self.h
-        mapping = self.table[:local_groups].view(b, self.h, self.columns)
-        mapping.zero_()
         local_used = self.used[:local_groups].view(b, self.h)
-        local_used.zero_()
-        if rows:
-            width = min(table.shape[1], self.columns)
-            mapping[: len(rows), :, :width].copy_(
-                table[: len(rows), None, :width] * self.h + self.head_ids[None, :, None]
+        # The gathered dense table has stable storage even when its contents
+        # change. Reuse requires the source allocator's explicit revision.
+        key = None
+        if table_revision is not None:
+            key = (
+                table_revision,
+                table.shape[1],
+                b,
+                idx,
+                tuple((r.req_id, r.position // self.block) for r in rows),
+                peer_pos // self.block if peer_q else -1,
             )
+        if key is None or self._mapping_key != key:
+            rebuild_start = profile.start()
+            self.row.fill_(idx if idx is not None else 0)
+            self.local_mask.zero_()
+            self.has_owner.fill_(idx is not None)
+            self.incoming.fill_(bool(peer_q))
+            local_used.zero_()
+            mapping = self.table[:local_groups].view(b, self.h, self.columns)
+            mapping.zero_()
+            if rows:
+                width = min(table.shape[1], self.columns)
+                mapping[: len(rows), :, :width].copy_(
+                    table[: len(rows), None, :width] * self.h
+                    + self.head_ids[None, :, None]
+                )
+            if idx is not None:
+                page = pos // self.block
+                address = self.address[self.rank]
+                mapping[idx, : self.half, : page + 1].copy_(address[: page + 1].T)
+                self.local_mask[idx] = True
+                self.owner_pages.copy_(address[page])
+            if peer_q:
+                page = peer_pos // self.block
+                address = self.address[peer]
+                self.table[local_groups : local_groups + self.half, : page + 1].copy_(
+                    address[: page + 1].T
+                )
+                self.remote_pages.copy_(address[page])
+            self._mapping_key = key
+            profile.finish("mapping_rebuild", self.rank, rebuild_start)
+
+        if rows:
             local_used[: len(rows)].copy_(seq_lens[: len(rows), None])
         if idx is not None:
-            n = cdiv(pos + 1, self.block)
-            address = self.address[self.rank]
-            mapping[idx, : self.half, :n].copy_(address[:n].T)
-            local_used[idx, self.half :] = 0
-            self.local_mask[idx] = True
-            self.owner_pages.copy_(address[pos // self.block])
+            local_used[idx, self.half :].zero_()
             self.owner_offset.fill_(pos % self.block)
-        self.has_owner.fill_(idx is not None)
         self.used[local_groups : local_groups + self.half].fill_(
             peer_pos + 1 if peer_q else 0
         )
-        self.incoming.fill_(bool(peer_q))
         if peer_q:
-            n = cdiv(peer_pos + 1, self.block)
-            address = self.address[peer]
-            self.table[local_groups : local_groups + self.half, :n].copy_(address[:n].T)
-            self.remote_pages.copy_(address[peer_pos // self.block])
             self.offset.fill_(peer_pos % self.block)
         stamp = profile.finish("mapping", self.rank, stamp)
+        if self.fa_version == 2:
+            # FA2 uses its launch split count, not the FA3 per-row vector.
+            self.prepare_decode_metadata(b, return_row=idx)
+            profile.finish("decode_metadata", self.rank, stamp)
+            return
         lengths = [r.position + 1 for r in rows] + [max(1, peer_pos + 1)]
         heads = [self.half if i == idx else self.h for i in range(len(rows))] + [
             self.half

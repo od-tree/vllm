@@ -85,6 +85,7 @@ class BlockTables:
         self.input_block_tables: list[torch.Tensor] = [
             torch.zeros_like(b.gpu) for b in self.block_tables
         ]
+        self._page_ids_changed = False
         self._num_dirty_rows = 0
 
         self.slot_mappings = torch.zeros(
@@ -103,6 +104,8 @@ class BlockTables:
         )
 
     def init_block_table_layout_tensors(self) -> None:
+        # Identity token also distinguishes replacement BlockTables instances.
+        self.page_mapping_revision = object()
         self.block_table_ptrs = self._make_ptr_tensor(
             [b.gpu for b in self.block_tables]
         )
@@ -128,6 +131,8 @@ class BlockTables:
         new_block_ids: tuple[list[int], ...],
         overwrite: bool,
     ) -> None:
+        if overwrite or any(len(ids) for ids in new_block_ids):
+            self._page_ids_changed = True
         for i in range(self.num_kv_cache_groups):
             start = self.num_blocks.np[i, req_index] if not overwrite else 0
             block_ids = new_block_ids[i]
@@ -156,6 +161,9 @@ class BlockTables:
                 self.block_tables, self.block_table_ptrs, self.block_table_strides
             )
         self.num_blocks.copy_to_uva()
+        if self._page_ids_changed:
+            self.page_mapping_revision = object()
+            self._page_ids_changed = False
 
     def gather_block_tables(
         self,

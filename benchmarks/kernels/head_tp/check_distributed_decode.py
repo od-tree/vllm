@@ -116,10 +116,10 @@ def main():
                     )
                     if rank == owner:
                         cache.index_fill_(0, table[selected_row].long(), float("nan"))
-                else:
+                elif decode.physical[owner] != packed:
                     decode.change_layout("grow", owner, target, packed, [], at)
                 assert len(decode.physical[owner]) == needed
-        decode.stage(scheduled, lens, rows, table)
+        decode.stage(scheduled, lens, rows, table, table_revision=0)
         q.normal_()
         k.normal_()
         v.normal_()
@@ -227,6 +227,25 @@ def main():
         f"rank {rank}: 1024 prefill tokens, 2 physical pages, head bytes exact",
         flush=True,
     )
+    # Reorder dense rows without changing the bucket, then remap one head
+    # page at the same position. Neither change may reuse stale addresses.
+    decode.change_layout("drop", 0, "", [], [], 0)
+    ids = [DecodeRow("A", 10), DecodeRow("B", 10)]
+    lens = table.new_full((2,), 11)
+    heads = torch.arange(h, device=device, dtype=table.dtype)
+    for order, dense, revision in (
+        (ids, table, 1),
+        (ids[::-1], table.flip(0), 1),
+        (ids[::-1], table.flip(0).roll(1, dims=1), 2),
+    ):
+        decode.stage(order, lens, rows, dense, table_revision=revision)
+        torch.testing.assert_close(
+            decode.table[: rows * h, 0].reshape(rows, h),
+            dense[:, :1] * h + heads,
+            atol=0,
+            rtol=0,
+        )
+    print(f"rank {rank}: reordered and replaced page maps match", flush=True)
     dist.destroy_process_group(cpu)
     dist.destroy_process_group()
 

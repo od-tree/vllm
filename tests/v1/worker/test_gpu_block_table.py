@@ -149,6 +149,21 @@ def test_block_tables_apply_staged_writes_single_group():
     )
 
 
+def test_page_mapping_revision_tracks_same_length_replacements():
+    table = BlockTables([16], 2, 16, [4], torch.device("cuda"))
+    empty = table.page_mapping_revision
+    table.append_block_ids(0, ([1, 2],), overwrite=True)
+    table.apply_staged_writes()
+    first = table.page_mapping_revision
+    assert first is not empty
+    table.append_block_ids(0, ([],), overwrite=False)
+    table.apply_staged_writes()
+    assert table.page_mapping_revision is first
+    table.append_block_ids(0, ([3, 4],), overwrite=True)
+    table.apply_staged_writes()
+    assert table.page_mapping_revision is not first
+
+
 def test_block_tables_skip_custom_slot_mapping_groups():
     device = torch.device("cuda")
     block_tables = BlockTables(

@@ -221,6 +221,36 @@ On a helper-only step it writes to the upper half of the spare row. The
 output projection consumes only the visible prefix. The two-rank operator
 benchmark uses the same padded allocation.
 
+### Reusing the virtual decode page table
+
+For uniform packed decode, the V2 worker keeps the expanded dense and packed
+page IDs in the same graph-bound tensor across steps. It rebuilds on a bucket
+change, request replacement or reorder, a local or peer logical page crossing,
+a committed native block-table mutation, or a packed lease change. Mixed
+prefill invalidates the saved mapping. An unversioned caller or a sliding
+window table takes the conservative rebuild path. On hits the worker still
+refreshes the active lengths, token offsets and return row before replay.
+The `mapping_rebuild` profile stage is nested inside `mapping`; compare its
+sample count to `stage` to distinguish rebuilds from reuse.
+
+FA2 does not read the FA3 per-row split buffer. It skips planning and
+uploading that vector while retaining the configured FA2 kernel dispatch.
+FA3 continues to stage the per-row plan and scheduler metadata every step.
+
+On dual RTX 5090 with the frozen `mixed4x2` workload, the owner measured
+the following milliseconds per stable decode step. Each configuration used
+one warmup and three measured rounds with the same tuned FA2 kernel dispatch.
+
+| Metadata preparation | Stage | Page mapping | FULL replay | Replay gap | Step |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original | 0.376 | 0.244 | 15.573 | 3.125 | 18.698 |
+| Skip FA2 row splits | 0.291 | 0.245 | 15.609 | 3.019 | 18.628 |
+| Skip FA2 row splits and reuse mappings | 0.120 | 0.083 | 15.551 | 2.784 | 18.335 |
+
+The owner rebuilt 12 times across 323 profiled steady steps. All greedy
+output token hashes matched the native DP reference. These timings cover FA2;
+Hopper FA3 timing requires a separate run.
+
 ### Sharing the FA3 decode schedule across layers
 
 On each rank the runner stages lengths, page tables and requested row splits

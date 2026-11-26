@@ -2060,6 +2060,11 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                     counts=counts,
                     mixed=not uniform,
                     peer_route=dp_sync_state.packed_routes[1 - self.dp_rank],
+                    table_revision=(
+                        None
+                        if self.block_tables.has_sliding_window_groups
+                        else self.block_tables.page_mapping_revision
+                    ),
                 )
                 profile.finish("stage", self.dp_rank, stage_start)
 
